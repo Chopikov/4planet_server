@@ -1,0 +1,635 @@
+openapi: 3.0.3
+info:
+  title: 4Planet POC API
+  version: 2.1.0
+servers:
+  - url: https://api.4planet-poc.local/v1
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    Offset:
+      name: offset
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+    Currency:
+      type: string
+      enum: [RUB, KZT, USD, EUR]
+    User:
+      type: object
+      properties:
+        auth_user_id: { type: string }
+        username: { type: string }
+        display_name: { type: string, nullable: true }
+        avatar_url: { type: string, nullable: true }
+        email: { type: string, format: email }
+        status: { type: string, enum: [pending, active, blocked] }
+        total_trees: { type: integer }
+        donations_count: { type: integer }
+        last_donation_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+      required: [auth_user_id, username, email, status, total_trees, donations_count, created_at]
+    Project:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [planned, in_progress, completed] }
+        starts_at: { type: string, format: date-time, nullable: true }
+        ends_at: { type: string, format: date-time, nullable: true }
+        country_code: { type: string, nullable: true }
+        region: { type: string, nullable: true }
+        location_geojson: { type: object }
+        trees_target: { type: integer, nullable: true }
+        trees_planted: { type: integer, nullable: true }
+        created_at: { type: string, format: date-time }
+      required: [id, title, status, location_geojson, created_at]
+    MediaFile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        kind: { type: string, enum: [image, video, document] }
+        url: { type: string, format: uri }
+        mime_type: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        alt_text: { type: string, nullable: true }
+        meta: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+      required: [id, project_id, kind, url, created_at]
+    NewsItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [achievement, invite, update] }
+        title: { type: string }
+        body_md: { type: string, nullable: true }
+        cover_url: { type: string, format: uri, nullable: true }
+        project_id: { type: string, format: uuid, nullable: true }
+        published_at: { type: string, format: date-time, nullable: true }
+      required: [id, type, title]
+    Achievement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        threshold_trees: { type: integer, nullable: true }
+        image_url: { type: string, format: uri, nullable: true }
+      required: [id, code, title]
+    UserAchievement:
+      type: object
+      properties:
+        achievement: { $ref: '#/components/schemas/Achievement' }
+        awarded_at: { type: string, format: date-time }
+        reason: { type: string, nullable: true }
+      required: [achievement, awarded_at]
+    Donation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        payment_id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid, nullable: true }
+        trees_count: { type: integer }
+        created_at: { type: string, format: date-time }
+      required: [id, payment_id, trees_count, created_at]
+    Subscription:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        provider: { type: string, enum: [cloudpayments, kaspi, paypal, tribute] }
+        provider_customer_id: { type: string, nullable: true }
+        provider_subscription_id: { type: string, nullable: true }
+        amount_minor: { type: integer }
+        currency: { $ref: '#/components/schemas/Currency' }
+        interval_months: { type: integer }
+        status: { type: string, enum: [active, past_due, canceled, paused, incomplete] }
+        started_at: { type: string, format: date-time }
+        canceled_at: { type: string, format: date-time, nullable: true }
+        meta: { type: object, additionalProperties: true }
+      required: [id, provider, amount_minor, currency, interval_months, status, started_at]
+    TreePrice:
+      type: object
+      properties:
+        currency: { $ref: '#/components/schemas/Currency' }
+        price_minor: { type: integer }
+        updated_at: { type: string, format: date-time }
+      required: [currency, price_minor, updated_at]
+    ShareLink:
+      type: object
+      properties:
+        slug: { type: string }
+        url: { type: string, format: uri }
+        kind: { type: string, enum: [profile, donation] }
+        ref_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+      required: [slug, url, kind, created_at]
+    PaymentIntentRequest:
+      type: object
+      required: [provider, amount_minor, currency]
+      properties:
+        provider: { type: string, enum: [cloudpayments] }
+        amount_minor: { type: integer }
+        currency: { $ref: '#/components/schemas/Currency' }
+        success_return_url: { type: string, format: uri }
+        fail_return_url: { type: string, format: uri }
+        description: { type: string, nullable: true }
+        project_id: { type: string, format: uuid, nullable: true, description: 'allocate donation to a specific project' }
+    PaymentIntentResponse:
+      type: object
+      properties:
+        provider: { type: string, enum: [cloudpayments] }
+        redirect_url: { type: string, format: uri }
+        provider_payload: { type: object, additionalProperties: true }
+    SubscriptionIntentRequest:
+      type: object
+      required: [provider, amount_minor, currency]
+      properties:
+        provider: { type: string, enum: [cloudpayments] }
+        amount_minor: { type: integer }
+        currency: { $ref: '#/components/schemas/Currency' }
+        success_return_url: { type: string, format: uri }
+        fail_return_url: { type: string, format: uri }
+        project_id: { type: string, format: uuid, nullable: true, description: 'optional preferred project for this subscription' }
+    SubscriptionIntentResponse:
+      type: object
+      properties:
+        provider: { type: string, enum: [cloudpayments] }
+        redirect_url: { type: string, format: uri }
+        provider_payload: { type: object, additionalProperties: true }
+
+paths:
+  # ========= AUTH (cookie-based) =========
+  /auth/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, username, password]
+              properties:
+                email: { type: string, format: email }
+                username: { type: string }
+                password: { type: string, format: password }
+                display_name: { type: string, nullable: true }
+      responses:
+        '201': { description: Registered (verification email sent) }
+        '400': { description: Bad request, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /auth/login:
+    post:
+      summary: Login with email/username and password (sets HttpOnly session cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login: { type: string, description: 'email or username' }
+                password: { type: string, format: password }
+      responses:
+        '200':
+          description: Logged in
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { description: Invalid credentials, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  /auth/logout:
+    post:
+      summary: Logout (revokes session and clears cookie)
+      responses:
+        '204': { description: Logged out }
+      security: [ { cookieAuth: [] } ]
+  /auth/me:
+    get:
+      summary: Current user
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { description: Unauthorized }
+      security: [ { cookieAuth: [] } ]
+  /auth/verify-email/request:
+    post:
+      summary: Request verification email (resend)
+      responses:
+        '204': { description: Sent }
+      security: [ { cookieAuth: [] } ]
+  /auth/verify-email/confirm:
+    post:
+      summary: Confirm email via token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '204': { description: Verified }
+        '400': { description: Invalid/expired token }
+  /auth/password/forgot:
+    post:
+      summary: Send password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '204': { description: Sent }
+  /auth/password/reset:
+    post:
+      summary: Reset password with token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token: { type: string }
+                new_password: { type: string, format: password }
+      responses:
+        '204': { description: Password reset }
+
+  # ========= DONATIONS & PAYMENTS =========
+  /donations:
+    get:
+      summary: List my donations
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Donation' } }
+                  total: { type: integer }
+      security: [ { cookieAuth: [] } ]
+  /payments/intents:
+    post:
+      summary: Create intent for one-time payment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentIntentRequest' }
+            examples:
+              cloudpayments:
+                value:
+                  provider: cloudpayments
+                  amount_minor: 19000
+                  currency: RUB
+                  success_return_url: https://app.local/return/success
+                  fail_return_url: https://app.local/return/fail
+                  project_id: null
+      responses:
+        '200':
+          description: Intent created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentIntentResponse' }
+              examples:
+                cloudpayments:
+                  value:
+                    provider: cloudpayments
+                    redirect_url: https://pay.cloudpayments.ru/pay/xyz
+                    provider_payload: { }
+      security: [ { cookieAuth: [] } ]
+
+  # ========= SUBSCRIPTIONS =========
+  /subscriptions:
+    get:
+      summary: List my subscriptions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Subscription' } }
+                  total: { type: integer }
+      security: [ { cookieAuth: [] } ]
+  /subscriptions/intents:
+    post:
+      summary: Create intent for recurring subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SubscriptionIntentRequest' }
+            examples:
+              cloudpayments:
+                value:
+                  provider: cloudpayments
+                  amount_minor: 19000
+                  currency: RUB
+                  success_return_url: https://app.local/return/success
+                  fail_return_url: https://app.local/return/fail
+                  project_id: null
+      responses:
+        '200':
+          description: Intent created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SubscriptionIntentResponse' }
+              examples:
+                cloudpayments:
+                  value:
+                    provider: cloudpayments
+                    redirect_url: https://pay.cloudpayments.ru/subscription/abc
+                    provider_payload: { }
+      security: [ { cookieAuth: [] } ]
+  /subscriptions/{id}:
+    get:
+      summary: Get my subscription by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Subscription' } } } }
+        '404': { description: Not found }
+      security: [ { cookieAuth: [] } ]
+  /subscriptions/{id}/charges:
+    get:
+      summary: Donations generated by this subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Donation' } }
+                  total: { type: integer }
+      security: [ { cookieAuth: [] } ]
+  /subscriptions/{id}/cancel:
+    post:
+      summary: Cancel subscription at provider and locally
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: Canceled }
+        '409': { description: Already canceled }
+      security: [ { cookieAuth: [] } ]
+
+  # ========= PROJECTS & MEDIA =========
+  /projects:
+    get:
+      summary: List projects
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [planned, in_progress, completed] }
+        - in: query
+          name: bbox
+          description: "minLon,minLat,maxLon,maxLat"
+          schema: { type: string, example: "37.35,55.55,37.75,55.95" }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Project' } }
+                  total: { type: integer }
+  /projects/{id}:
+    get:
+      summary: Get project by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
+        '404': { description: Not found }
+  /projects/{id}/media:
+    get:
+      summary: List media for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/MediaFile' } }
+
+  # ========= NEWS =========
+  /news:
+    get:
+      summary: News feed
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/NewsItem' } }
+                  total: { type: integer }
+
+  # ========= PRICES =========
+  /prices:
+    get:
+      summary: Current price per tree by currency
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TreePrice' } } } } }
+
+  # ========= LEADERBOARD =========
+  /leaderboard:
+    get:
+      summary: Top users by total trees
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        auth_user_id: { type: string }
+                        username: { type: string }
+                        display_name: { type: string, nullable: true }
+                        avatar_url: { type: string, nullable: true }
+                        total_trees: { type: integer }
+                  total: { type: integer }
+
+  # ========= SHARES =========
+  /shares/profile:
+    post:
+      summary: Create profile share link
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ShareLink' } } } }
+      security: [ { cookieAuth: [] } ]
+  /shares/donation/{donationId}:
+    post:
+      summary: Create donation share link
+      parameters:
+        - name: donationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ShareLink' } } } }
+      security: [ { cookieAuth: [] } ]
+  /shares/resolve/{slug}:
+    get:
+      summary: Public share resolver
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  kind: { type: string, enum: [profile, donation] }
+                  payload:
+                    oneOf:
+                      - type: object
+                        properties:
+                          user: { $ref: '#/components/schemas/User' }
+                          badges: { type: array, items: { $ref: '#/components/schemas/Achievement' } }
+                      - type: object
+                        properties:
+                          donation: { $ref: '#/components/schemas/Donation' }
+        '404': { description: Not found }
+
+  # ========= ACHIEVEMENTS =========
+  /achievements:
+    get:
+      summary: My achievements
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/UserAchievement' } }
+      security: [ { cookieAuth: [] } ]
+  /badges:
+    get:
+      summary: All available achievements (catalog)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Achievement' } }
+
+  # ========= WEBHOOKS =========
+  /webhooks/{provider}:
+    post:
+      summary: Payment provider webhook (CloudPayments to start)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string, enum: [cloudpayments, kaspi, paypal, tribute] }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+            examples:
+              cloudpayments-payment-succeeded:
+                value:
+                  Type: Payment
+                  TransactionId: "abc-123"
+                  Amount: 190.00
+                  Currency: RUB
+                  Status: Succeeded
+                  AccountId: "user@example.com"
+                  OccurredAt: "2025-08-01T10:05:00Z"
+              cloudpayments-subscription-charge:
+                value:
+                  Type: SubscriptionCharge
+                  SubscriptionId: "sub-001"
+                  TransactionId: "tx-987"
+                  Amount: 190.00
+                  Currency: RUB
+                  Status: Succeeded
+                  AccountId: "user@example.com"
+                  OccurredAt: "2025-09-01T10:05:00Z"
+              refund-example:
+                value:
+                  Type: Refund
+                  TransactionId: "tx-987"
+                  Amount: 190.00
+                  Currency: RUB
+                  Status: Refunded
+                  Reason: "customer_request"
+                  OccurredAt: "2025-09-02T08:00:00Z"
+      responses:
+        '200': { description: Accepted }
+        '400': { description: Invalid signature or payload }
+        '409': { description: Duplicate event }

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:latest
+    container_name: 4planet-postgres
+    environment:
+      POSTGRES_DB: planet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d planet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: 4planet-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "1025"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # api:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: 4planet-api
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - APP_BASE_URL=http://localhost:8080
+  #     - APP_COOKIE_NAME=session_id
+  #     - APP_COOKIE_DOMAIN=localhost
+  #     - APP_COOKIE_SECURE=false
+  #     - DB_DSN=postgres://postgres:postgres@postgres:5432/planet?sslmode=disable
+  #     - SMTP_HOST=mailhog
+  #     - SMTP_PORT=1025
+  #     - SMTP_USER=
+  #     - SMTP_PASSWORD=
+  #     - SMTP_FROM=noreply@4planet.local
+  #     - CLOUDPAYMENTS_PUBLIC_ID=
+  #     - CLOUDPAYMENTS_SECRET=
+  #     - LOG_LEVEL=debug
+  #     - ADMIN_USERNAME=admin
+  #     - ADMIN_PASSWORD=admin
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     mailhog:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./openapi.yaml:/app/openapi.yaml:ro
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
