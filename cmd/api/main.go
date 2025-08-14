@@ -202,8 +202,14 @@ func main() {
 		})
 
 		adminRouter.GET("/users", func(c *gin.Context) {
-			var users []models.User
-			database.GetDB().Find(&users)
+			var users []struct {
+				models.User
+				Status string `json:"status"`
+			}
+			database.GetDB().Table("users").
+				Select("users.*, user_auth.status").
+				Joins("JOIN user_auth ON users.auth_user_id = user_auth.auth_user_id").
+				Find(&users)
 			c.JSON(http.StatusOK, users)
 		})
 

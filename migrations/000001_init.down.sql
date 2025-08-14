@@ -20,6 +20,11 @@ DROP INDEX IF EXISTS idx_password_reset_user;
 DROP INDEX IF EXISTS idx_email_verif_user;
 DROP INDEX IF EXISTS idx_sessions_valid;
 DROP INDEX IF EXISTS idx_sessions_user;
+DROP INDEX IF EXISTS idx_users_email;
+DROP INDEX IF EXISTS idx_users_username;
+DROP INDEX IF EXISTS idx_users_auth_user_id;
+DROP INDEX IF EXISTS idx_user_auth_status;
+DROP INDEX IF EXISTS idx_user_auth_email;
 
 -- Drop tables
 DROP TABLE IF EXISTS webhook_events;
@@ -37,6 +42,7 @@ DROP TABLE IF EXISTS password_reset_tokens;
 DROP TABLE IF EXISTS email_verification_tokens;
 DROP TABLE IF EXISTS sessions;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS user_auth;
 
 -- Drop enum types
 DROP TYPE IF EXISTS media_kind;

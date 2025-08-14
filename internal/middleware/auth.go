@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/4planet/backend/internal/config"
+	"github.com/4planet/backend/internal/models"
 	"github.com/4planet/backend/pkg/auth"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,8 +38,16 @@ func RequireAuth(authService *auth.Service, config *config.Config) gin.HandlerFu
 			return
 		}
 
+		// Get user auth data to check status
+		userAuth, err := authService.GetUserAuthByAuthUserID(user.AuthUserID)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user data"})
+			c.Abort()
+			return
+		}
+
 		// Check if user is active
-		if user.Status != "active" {
+		if userAuth.Status != models.UserStatusActive {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Account not active"})
 			c.Abort()
 			return
@@ -75,8 +84,15 @@ func OptionalAuth(authService *auth.Service, config *config.Config) gin.HandlerF
 			return
 		}
 
+		// Get user auth data to check status
+		userAuth, err := authService.GetUserAuthByAuthUserID(user.AuthUserID)
+		if err != nil {
+			c.Next()
+			return
+		}
+
 		// Check if user is active
-		if user.Status != "active" {
+		if userAuth.Status != models.UserStatusActive {
 			c.Next()
 			return
 		}

@@ -124,14 +124,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Get user auth data to check status and password
+	userAuth, err := h.authService.GetUserAuthByAuthUserID(user.AuthUserID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		return
+	}
+
 	// Check if user is active
-	if user.Status != models.UserStatusActive {
+	if userAuth.Status != models.UserStatusActive {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Account not active"})
 		return
 	}
 
 	// Check password
-	if user.PasswordHash == nil || !h.authService.CheckPassword(req.Password, *user.PasswordHash) {
+	if userAuth.PasswordHash == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Account has no password set"})
+		return
+	}
+	if !h.authService.CheckPassword(req.Password, *userAuth.PasswordHash) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}

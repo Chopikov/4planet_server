@@ -149,19 +149,19 @@ func (s *Service) CreatePasswordResetToken(authUserID string, expiresAt time.Tim
 
 // VerifyPasswordResetToken verifies a password reset token
 func (s *Service) VerifyPasswordResetToken(tokenStr string) (*models.PasswordResetToken, error) {
-	var token models.PasswordResetToken
-	err := s.db.Where("token = ? AND expires_at > ? AND used_at IS NULL", tokenStr, time.Now()).First(&token).Error
+	token := &models.PasswordResetToken{}
+	err := s.db.Where("token = ? AND expires_at > ? AND used_at IS NULL", tokenStr, time.Now()).First(token).Error
 	if err != nil {
 		return nil, err
 	}
 
 	// Mark token as used
 	now := time.Now()
-	if err := s.db.Model(&token).Update("used_at", now).Error; err != nil {
+	if err := s.db.Model(token).Update("used_at", now).Error; err != nil {
 		return nil, fmt.Errorf("failed to mark token as used: %w", err)
 	}
 
-	return &token, nil
+	return token, nil
 }
 
 // GetUserByEmail retrieves a user by email
@@ -194,35 +194,88 @@ func (s *Service) GetUserByLogin(login string) (*models.User, error) {
 	return &user, nil
 }
 
-// CreateUser creates a new user
+// GetUserAuthByEmail retrieves UserAuth by email
+func (s *Service) GetUserAuthByEmail(email string) (*models.UserAuth, error) {
+	var userAuth models.UserAuth
+	err := s.db.Where("email = ?", email).First(&userAuth).Error
+	if err != nil {
+		return nil, err
+	}
+	return &userAuth, nil
+}
+
+// GetUserAuthByAuthUserID retrieves UserAuth by auth_user_id
+func (s *Service) GetUserAuthByAuthUserID(authUserID string) (*models.UserAuth, error) {
+	var userAuth models.UserAuth
+	err := s.db.Where("auth_user_id = ?", authUserID).First(&userAuth).Error
+	if err != nil {
+		return nil, err
+	}
+	return &userAuth, nil
+}
+
+// CreateUser creates a new user with both User and UserAuth records
 func (s *Service) CreateUser(email, username, passwordHash string, displayName *string) (*models.User, error) {
-	user := &models.User{
-		AuthUserID:   uuid.New().String(),
+	// Start a transaction
+	tx := s.db.Begin()
+	if tx.Error != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Generate auth_user_id
+	authUserID := uuid.New().String()
+
+	// Create UserAuth record
+	userAuth := &models.UserAuth{
+		ID:           uuid.New(),
+		AuthUserID:   authUserID,
 		Email:        email,
-		Username:     &username,
 		PasswordHash: &passwordHash,
-		DisplayName:  displayName,
 		Status:       models.UserStatusPending,
 	}
 
-	if err := s.db.Create(user).Error; err != nil {
+	if err := tx.Create(userAuth).Error; err != nil {
+		tx.Rollback()
+		return nil, fmt.Errorf("failed to create user auth: %w", err)
+	}
+
+	// Create User record
+	user := &models.User{
+		AuthUserID:  authUserID,
+		Email:       email,
+		Username:    &username,
+		DisplayName: displayName,
+	}
+
+	if err := tx.Create(user).Error; err != nil {
+		tx.Rollback()
 		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return user, nil
 }
 
-// UpdateUserPassword updates a user's password
+// UpdateUserPassword updates a user's password in UserAuth
 func (s *Service) UpdateUserPassword(authUserID, passwordHash string) error {
-	return s.db.Model(&models.User{}).Where("auth_user_id = ?", authUserID).Update("password_hash", passwordHash).Error
+	return s.db.Model(&models.UserAuth{}).Where("auth_user_id = ?", authUserID).Update("password_hash", passwordHash).Error
 }
 
-// VerifyUserEmail verifies a user's email
+// VerifyUserEmail verifies a user's email in UserAuth
 func (s *Service) VerifyUserEmail(authUserID string) error {
 	now := time.Now()
-	return s.db.Model(&models.User{}).Where("auth_user_id = ?", authUserID).Updates(map[string]interface{}{
-		"email_verified_at": now,
-		"status":            models.UserStatusActive,
+	return s.db.Model(&models.UserAuth{}).Where("auth_user_id = ?", authUserID).Updates(map[string]interface{}{
+		"verified_at": now,
+		"status":      models.UserStatusActive,
 	}).Error
 }
 

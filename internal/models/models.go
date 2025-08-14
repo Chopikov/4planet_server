@@ -6,34 +6,50 @@ import (
 	"github.com/google/uuid"
 )
 
-// User represents the users table
+// User represents the users table (profile data)
 type User struct {
-	AuthUserID      string     `gorm:"column:auth_user_id;primaryKey;type:text"`
-	Username        *string    `gorm:"column:username;uniqueIndex;type:text"`
-	DisplayName     *string    `gorm:"column:display_name;type:text"`
-	AvatarURL       *string    `gorm:"column:avatar_url;type:text"`
-	Email           string     `gorm:"column:email;uniqueIndex;type:text;not null"`
-	EmailVerifiedAt *time.Time `gorm:"column:email_verified_at;type:timestamptz"`
-	Status          UserStatus `gorm:"column:status;type:user_status;not null;default:'pending'"`
-	PasswordHash    *string    `gorm:"column:password_hash;type:text"`
-	TotalTrees      int        `gorm:"column:total_trees;type:int;not null;default:0"`
-	DonationsCount  int        `gorm:"column:donations_count;type:int;not null;default:0"`
-	LastDonationAt  *time.Time `gorm:"column:last_donation_at;type:timestamptz"`
-	CreatedAt       time.Time  `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
+	ID             uuid.UUID  `gorm:"column:id;primaryKey;type:uuid;default:gen_random_uuid()"`
+	AuthUserID     string     `gorm:"column:auth_user_id;uniqueIndex;type:text;not null"`
+	Username       *string    `gorm:"column:username;uniqueIndex;type:text"`
+	DisplayName    *string    `gorm:"column:display_name;type:text"`
+	AvatarURL      *string    `gorm:"column:avatar_url;type:text"`
+	Email          string     `gorm:"column:email;type:text;not null"`
+	TotalTrees     int        `gorm:"column:total_trees;type:int;not null;default:0"`
+	DonationsCount int        `gorm:"column:donations_count;type:int;not null;default:0"`
+	LastDonationAt *time.Time `gorm:"column:last_donation_at;type:timestamptz"`
+	CreatedAt      time.Time  `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
 
 	// Relationships
-	Sessions                []Session                `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	Sessions         []Session         `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	Subscriptions    []Subscription    `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	Payments         []Payment         `gorm:"foreignKey:AuthUserID;constraint:OnDelete:SET NULL"`
+	Donations        []Donation        `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	UserAchievements []UserAchievement `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	ShareTokens      []ShareToken      `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+}
+
+// UserAuth represents user authentication data
+type UserAuth struct {
+	ID           uuid.UUID  `gorm:"column:id;primaryKey;type:uuid;default:gen_random_uuid()"`
+	AuthUserID   string     `gorm:"column:auth_user_id;uniqueIndex;type:text;not null"`
+	Email        string     `gorm:"column:email;uniqueIndex;type:text;not null"`
+	PasswordHash *string    `gorm:"column:password_hash;type:text"`
+	Status       UserStatus `gorm:"column:status;type:user_status;not null;default:'pending'"`
+	VerifiedAt   *time.Time `gorm:"column:verified_at;type:timestamptz"`
+	CreatedAt    time.Time  `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
+	UpdatedAt    time.Time  `gorm:"column:updated_at;type:timestamptz;not null;default:now()"`
+
+	// Relationships
 	EmailVerificationTokens []EmailVerificationToken `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
 	PasswordResetTokens     []PasswordResetToken     `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
-	Subscriptions           []Subscription           `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
-	Payments                []Payment                `gorm:"foreignKey:AuthUserID;constraint:OnDelete:SET NULL"`
-	Donations               []Donation               `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
-	UserAchievements        []UserAchievement        `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
-	ShareTokens             []ShareToken             `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
 }
 
 func (User) TableName() string {
 	return "users"
+}
+
+func (UserAuth) TableName() string {
+	return "user_auth"
 }
 
 // Session represents the sessions table

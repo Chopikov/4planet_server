@@ -353,13 +353,51 @@ func seedMediaFiles(ctx context.Context, db *gorm.DB) error {
 }
 
 func seedTestUsers(ctx context.Context, db *gorm.DB) error {
+	// Create UserAuth records first
+	userAuths := []models.UserAuth{
+		{
+			ID:           uuid.New(),
+			AuthUserID:   "test-user-1",
+			Email:        "john@example.com",
+			PasswordHash: nil, // No password for demo
+			Status:       models.UserStatusActive,
+			VerifiedAt:   &time.Time{},
+		},
+		{
+			ID:           uuid.New(),
+			AuthUserID:   "test-user-2",
+			Email:        "jane@example.com",
+			PasswordHash: nil, // No password for demo
+			Status:       models.UserStatusActive,
+			VerifiedAt:   &time.Time{},
+		},
+		{
+			ID:           uuid.New(),
+			AuthUserID:   "test-user-3",
+			Email:        "bob@example.com",
+			PasswordHash: nil, // No password for demo
+			Status:       models.UserStatusPending,
+			VerifiedAt:   nil, // Not verified yet
+		},
+	}
+
+	for i := range userAuths {
+		if i == 0 || i == 1 {
+			*userAuths[i].VerifiedAt = time.Now().Add(-time.Duration(i+1) * 24 * time.Hour)
+		}
+		if err := db.WithContext(ctx).Where("auth_user_id = ?", userAuths[i].AuthUserID).
+			FirstOrCreate(&userAuths[i]).Error; err != nil {
+			return err
+		}
+	}
+
+	// Create User records (profile data)
 	users := []models.User{
 		{
 			AuthUserID:     "test-user-1",
 			Username:       stringPtr("john_doe"),
 			DisplayName:    stringPtr("John Doe"),
 			Email:          "john@example.com",
-			Status:         models.UserStatusActive,
 			TotalTrees:     15,
 			DonationsCount: 3,
 		},
@@ -368,7 +406,6 @@ func seedTestUsers(ctx context.Context, db *gorm.DB) error {
 			Username:       stringPtr("jane_smith"),
 			DisplayName:    stringPtr("Jane Smith"),
 			Email:          "jane@example.com",
-			Status:         models.UserStatusActive,
 			TotalTrees:     42,
 			DonationsCount: 8,
 		},
@@ -377,7 +414,6 @@ func seedTestUsers(ctx context.Context, db *gorm.DB) error {
 			Username:       stringPtr("bob_wilson"),
 			DisplayName:    stringPtr("Bob Wilson"),
 			Email:          "bob@example.com",
-			Status:         models.UserStatusPending,
 			TotalTrees:     0,
 			DonationsCount: 0,
 		},

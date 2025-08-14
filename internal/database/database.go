@@ -90,6 +90,7 @@ func autoMigrate() error {
 
 	models := []interface{}{
 		&models.User{},
+		&models.UserAuth{},
 		&models.Session{},
 		&models.EmailVerificationToken{},
 		&models.PasswordResetToken{},

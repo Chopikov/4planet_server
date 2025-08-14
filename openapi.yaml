@@ -3,6 +3,7 @@ info:
   title: 4Planet POC API
   version: 2.1.0
 servers:
+  - url: http://localhost:8080/v1
   - url: https://api.4planet-poc.local/v1
 components:
   securitySchemes:
@@ -27,20 +28,32 @@ components:
     Currency:
       type: string
       enum: [RUB, KZT, USD, EUR]
+    UserAuth:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        auth_user_id: { type: string }
+        email: { type: string, format: email }
+        password_hash: { type: string, nullable: true }
+        status: { type: string, enum: [pending, active, blocked] }
+        verified_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+      required: [id, auth_user_id, email, status, created_at, updated_at]
     User:
       type: object
       properties:
+        id: { type: string, format: uuid }
         auth_user_id: { type: string }
-        username: { type: string }
+        username: { type: string, nullable: true }
         display_name: { type: string, nullable: true }
         avatar_url: { type: string, nullable: true }
         email: { type: string, format: email }
-        status: { type: string, enum: [pending, active, blocked] }
         total_trees: { type: integer }
         donations_count: { type: integer }
         last_donation_at: { type: string, format: date-time, nullable: true }
         created_at: { type: string, format: date-time }
-      required: [auth_user_id, username, email, status, total_trees, donations_count, created_at]
+      required: [id, auth_user_id, username, email, total_trees, donations_count, created_at]
     Project:
       type: object
       properties:
