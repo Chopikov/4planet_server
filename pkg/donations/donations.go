@@ -32,6 +32,7 @@ func (s *Service) GetUserDonations(authUserID string, limit int, offset int) ([]
 		Preload("Payment").
 		Preload("Project").
 		Order("created_at DESC").
+		Omit("User").
 		Limit(limit).
 		Offset(offset).
 		Find(&donations).Error

@@ -30,6 +30,7 @@ func (s *Service) GetUserSubscriptions(authUserID string, limit int, offset int)
 	// Get paginated results
 	err = s.db.Where("auth_user_id = ?", authUserID).
 		Order("started_at DESC").
+		Omit("User").
 		Limit(limit).
 		Offset(offset).
 		Find(&subscriptions).Error

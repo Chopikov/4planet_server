@@ -50,3 +50,17 @@ func (s *Service) GetUserByEmail(email string) (*models.User, error) {
 func (s *Service) UpdateUser(user *models.User) error {
 	return s.db.Save(user).Error
 }
+
+func (s *Service) GetLeaderboard(limit int, offset int) ([]models.User, int, error) {
+	var users []models.User
+	var total int64
+	err := s.db.Model(&models.User{}).Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	err = s.db.Order("total_trees DESC").Limit(limit).Offset(offset).Find(&users).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return users, int(total), nil
+}

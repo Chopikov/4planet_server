@@ -205,7 +205,7 @@ type UserAchievement struct {
 	Reason        *string   `gorm:"column:reason;type:text"`
 
 	// Relationships
-	User        User        `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	User        User        `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE" json:"-"`
 	Achievement Achievement `gorm:"foreignKey:AchievementID;constraint:OnDelete:CASCADE"`
 }
 

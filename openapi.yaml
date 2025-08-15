@@ -119,10 +119,12 @@ components:
     UserAchievement:
       type: object
       properties:
-        achievement: { $ref: '#/components/schemas/Achievement' }
+        auth_user_id: { type: string }
+        achievement_id: { type: string, format: uuid }
         awarded_at: { type: string, format: date-time }
         reason: { type: string, nullable: true }
-      required: [achievement, awarded_at]
+        achievement: { $ref: '#/components/schemas/Achievement' }
+      required: [auth_user_id, achievement_id, awarded_at, achievement]
     Donation:
       type: object
       properties:
@@ -286,6 +288,25 @@ paths:
                   - type: object
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/Subscription' } }
+        '401': { description: Unauthorized }
+      security: [ { cookieAuth: [] } ]
+  /me/achievements:
+    get:
+      summary: List my achievements
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/UserAchievement' } }
         '401': { description: Unauthorized }
       security: [ { cookieAuth: [] } ]
   /auth/verify-email/request:
@@ -553,7 +574,7 @@ paths:
         '404': { description: Price not found for currency, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   # ========= LEADERBOARD =========
-  /leaderboard:
+  /users/leaderboard:
     get:
       summary: Top users by total trees
       parameters:
@@ -574,11 +595,12 @@ paths:
                         items:
                           type: object
                           properties:
-                            auth_user_id: { type: string }
-                            username: { type: string }
-                            display_name: { type: string, nullable: true }
+                            username: { type: string, nullable: true }
                             avatar_url: { type: string, nullable: true }
                             total_trees: { type: integer }
+                            donations_count: { type: integer }
+                            last_donation_at: { type: string, format: date-time, nullable: true }
+                            created_at: { type: string, format: date-time }
 
   # ========= SHARES =========
   /shares/profile:
@@ -627,16 +649,6 @@ paths:
         '404': { description: Not found }
 
   # ========= ACHIEVEMENTS =========
-  /achievements:
-    get:
-      summary: My achievements
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { type: array, items: { $ref: '#/components/schemas/UserAchievement' } }
-      security: [ { cookieAuth: [] } ]
   /badges:
     get:
       summary: All available achievements (catalog)

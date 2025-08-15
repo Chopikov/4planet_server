@@ -31,7 +31,7 @@ This document summarizes the complete implementation of the 4Planet backend API 
 - **Payments**: `/v1/payments/intents` ✅
 - **Subscriptions**: `/v1/subscriptions/intents` ✅
 - **Projects**: `/v1/projects/*` ✅
-- **Achievements**: `/v1/achievements` and `/v1/badges` ✅
+- **Achievements**: `/v1/me/achievements`, `/v1/achievements`, and `/v1/badges` ✅
 - **Leaderboard**: `/v1/leaderboard` ✅
 - **Sharing**: `/v1/shares/*` endpoints ✅
 - **Webhooks**: `/webhooks/{provider}` ✅

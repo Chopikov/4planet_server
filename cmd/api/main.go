@@ -14,6 +14,7 @@ import (
 	"github.com/4planet/backend/internal/handlers"
 	"github.com/4planet/backend/internal/middleware"
 	"github.com/4planet/backend/internal/models"
+	"github.com/4planet/backend/pkg/achievements"
 	"github.com/4planet/backend/pkg/auth"
 	"github.com/4planet/backend/pkg/donations"
 	"github.com/4planet/backend/pkg/mailer"
@@ -55,6 +56,7 @@ func main() {
 	projectsService := projects.NewService()
 	newsService := news.NewService()
 	pricesService := prices.NewService()
+	achievementsService := achievements.NewService()
 
 	var mailerService mailer.Mailer
 	if cfg.SMTP.Host != "" {
@@ -77,10 +79,11 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, mailerService, cfg)
-	userHandler := handlers.NewUserHandler(userService, donationService, subscriptionService)
+	userHandler := handlers.NewUserHandler(userService, donationService, subscriptionService, achievementsService)
 	projectsHandler := handlers.NewProjectsHandler(projectsService, cfg)
 	newsHandler := handlers.NewNewsHandler(newsService, cfg)
 	pricesHandler := handlers.NewPricesHandler(pricesService, cfg)
+	achievementsHandler := handlers.NewAchievementsHandler(achievementsService, cfg)
 
 	// Set Gin mode
 	if cfg.Log.Level == "debug" {
@@ -120,6 +123,7 @@ func main() {
 			me.GET("", userHandler.Me)
 			me.GET("/donations", userHandler.GetMyDonations)
 			me.GET("/subscriptions", userHandler.GetMySubscriptions)
+			me.GET("/achievements", userHandler.GetMyAchievements)
 		}
 
 		// Projects
@@ -142,6 +146,22 @@ func main() {
 			prices.GET("/:currency", pricesHandler.GetPriceByCurrency)
 		}
 
+		// Achievements
+		achievements := v1.Group("/achievements")
+		achievements.Use(middleware.RequireAuth(authService, cfg))
+		{
+			achievements.GET("", achievementsHandler.GetAchievements)
+		}
+
+		// Badges (public catalog of all achievements)
+		v1.GET("/badges", achievementsHandler.GetAchievements)
+
+		users := v1.Group("/users")
+		users.Use(middleware.RequireAuth(authService, cfg))
+		{
+			users.GET("/leaderboard", userHandler.GetLeaderboard)
+		}
+
 		// Donations & Payments
 		v1.POST("/payments/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
 			// TODO: Implement payment intent handler
@@ -152,23 +172,6 @@ func main() {
 		v1.POST("/subscriptions/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
 			// TODO: Implement subscription intent handler
 			c.JSON(http.StatusOK, gin.H{"message": "Subscription intent endpoint"})
-		})
-
-		// Leaderboard
-		v1.GET("/leaderboard", func(c *gin.Context) {
-			// TODO: Implement leaderboard handler
-			c.JSON(http.StatusOK, gin.H{"message": "Leaderboard endpoint"})
-		})
-
-		// Achievements
-		v1.GET("/achievements", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
-			// TODO: Implement achievements handler
-			c.JSON(http.StatusOK, gin.H{"message": "Achievements endpoint"})
-		})
-
-		v1.GET("/badges", func(c *gin.Context) {
-			// TODO: Implement badges handler
-			c.JSON(http.StatusOK, gin.H{"message": "Badges endpoint"})
 		})
 
 		// Shares
@@ -198,21 +201,6 @@ func main() {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported provider"})
 		}
 	})
-
-	// Serve OpenAPI spec
-	router.GET("/openapi.yaml", func(c *gin.Context) {
-		c.File("openapi.yaml")
-	})
-
-	// Serve Swagger UI
-	router.GET("/docs", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "swagger.html", gin.H{
-			"title": "4Planet API Documentation",
-		})
-	})
-
-	// Load HTML templates
-	router.LoadHTMLGlob("web/**/*.html")
 
 	// Admin interface
 	adminRouter := router.Group("/admin")
@@ -251,6 +239,21 @@ func main() {
 			c.JSON(http.StatusOK, donations)
 		})
 	}
+
+	// Load HTML templates
+	router.LoadHTMLGlob("web/**/*.html")
+
+	// Serve OpenAPI spec
+	router.GET("/openapi.yaml", func(c *gin.Context) {
+		c.File("openapi.yaml")
+	})
+
+	// Serve Swagger UI
+	router.GET("/docs", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "swagger.html", gin.H{
+			"title": "4Planet API Documentation",
+		})
+	})
 
 	// Health check
 	router.GET("/health", func(c *gin.Context) {

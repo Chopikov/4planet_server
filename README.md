@@ -119,8 +119,9 @@ This will:
 - `GET /v1/projects/{id}/media` - Get project media
 
 ### Achievements & Leaderboard
-- `GET /v1/achievements` - User achievements
-- `GET /v1/badges` - Available achievements
+- `GET /v1/me/achievements` - User achievements (authenticated)
+- `GET /v1/achievements` - All available achievements catalog (authenticated)
+- `GET /v1/badges` - All available achievements catalog (public)
 - `GET /v1/leaderboard` - Top users by trees
 
 ### Sharing
