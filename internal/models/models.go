@@ -128,6 +128,7 @@ type Project struct {
 	LocationGeoJSON interface{}   `gorm:"column:location_geojson;type:jsonb;not null;index:type:gin"`
 	TreesTarget     *int          `gorm:"column:trees_target;type:integer"`
 	TreesPlanted    *int          `gorm:"column:trees_planted;type:integer"`
+	CoverURL        *string       `gorm:"column:cover_url;type:text"`
 	CreatedAt       time.Time     `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
 
 	// Relationships
@@ -153,7 +154,7 @@ type MediaFile struct {
 	CreatedAt time.Time   `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
 
 	// Relationships
-	Project Project `gorm:"foreignKey:ProjectID;constraint:OnDelete:CASCADE"`
+	Project Project `gorm:"foreignKey:ProjectID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
 func (MediaFile) TableName() string {

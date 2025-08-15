@@ -202,6 +202,7 @@ func seedProjects(ctx context.Context, db *gorm.DB) error {
 			},
 			TreesTarget:  intPtr(10000),
 			TreesPlanted: intPtr(2500),
+			CoverURL:     stringPtr("https://picsum.photos/id/237/536/354"),
 		},
 		{
 			Title:       "Almaty Green Belt",
@@ -215,6 +216,7 @@ func seedProjects(ctx context.Context, db *gorm.DB) error {
 			},
 			TreesTarget:  intPtr(5000),
 			TreesPlanted: intPtr(0),
+			CoverURL:     stringPtr("https://picsum.photos/id/237/536/354"),
 		},
 		{
 			Title:       "Kazakhstan Steppe Restoration",
@@ -230,6 +232,7 @@ func seedProjects(ctx context.Context, db *gorm.DB) error {
 			},
 			TreesTarget:  intPtr(2000),
 			TreesPlanted: intPtr(2000),
+			CoverURL:     stringPtr("https://picsum.photos/id/237/536/354"),
 		},
 	}
 

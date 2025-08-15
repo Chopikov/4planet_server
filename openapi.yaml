@@ -25,6 +25,17 @@ components:
       type: object
       properties:
         error: { type: string }
+    PaginatedResponse:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/GenericItem' } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+      required: [items, total, limit, offset]
+    GenericItem:
+      type: object
+      description: Generic item placeholder - will be overridden by specific item types in each endpoint
     Currency:
       type: string
       enum: [RUB, KZT, USD, EUR]
@@ -68,6 +79,7 @@ components:
         location_geojson: { type: object }
         trees_target: { type: integer, nullable: true }
         trees_planted: { type: integer, nullable: true }
+        cover_url: { type: string, format: uri, nullable: true }
         created_at: { type: string, format: date-time }
       required: [id, title, status, location_geojson, created_at]
     MediaFile:
@@ -234,11 +246,46 @@ paths:
       responses:
         '204': { description: Logged out }
       security: [ { cookieAuth: [] } ]
-  /auth/me:
+  /me:
     get:
       summary: Current user
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { description: Unauthorized }
+      security: [ { cookieAuth: [] } ]
+  /me/donations:
+    get:
+      summary: List my donations
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Donation' } }
+        '401': { description: Unauthorized }
+      security: [ { cookieAuth: [] } ]
+  /me/subscriptions:
+    get:
+      summary: List my subscriptions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Subscription' } }
         '401': { description: Unauthorized }
       security: [ { cookieAuth: [] } ]
   /auth/verify-email/request:
@@ -293,23 +340,6 @@ paths:
         '204': { description: Password reset }
 
   # ========= DONATIONS & PAYMENTS =========
-  /donations:
-    get:
-      summary: List my donations
-      parameters:
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items: { type: array, items: { $ref: '#/components/schemas/Donation' } }
-                  total: { type: integer }
-      security: [ { cookieAuth: [] } ]
   /payments/intents:
     post:
       summary: Create intent for one-time payment
@@ -342,20 +372,6 @@ paths:
       security: [ { cookieAuth: [] } ]
 
   # ========= SUBSCRIPTIONS =========
-  /subscriptions:
-    get:
-      summary: List my subscriptions
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  items: { type: array, items: { $ref: '#/components/schemas/Subscription' } }
-                  total: { type: integer }
-      security: [ { cookieAuth: [] } ]
   /subscriptions/intents:
     post:
       summary: Create intent for recurring subscription
@@ -450,10 +466,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items: { type: array, items: { $ref: '#/components/schemas/Project' } }
-                  total: { type: integer }
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Project' } }
   /projects/{id}:
     get:
       summary: Get project by id
@@ -465,20 +482,6 @@ paths:
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Project' } } } }
         '404': { description: Not found }
-  /projects/{id}/media:
-    get:
-      summary: List media for a project
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema: { type: array, items: { $ref: '#/components/schemas/MediaFile' } }
 
   # ========= NEWS =========
   /news:
@@ -493,10 +496,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items: { type: array, items: { $ref: '#/components/schemas/NewsItem' } }
-                  total: { type: integer }
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/NewsItem' } }
 
   # ========= PRICES =========
   /prices:
@@ -518,19 +522,20 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  items:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        auth_user_id: { type: string }
-                        username: { type: string }
-                        display_name: { type: string, nullable: true }
-                        avatar_url: { type: string, nullable: true }
-                        total_trees: { type: integer }
-                  total: { type: integer }
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            auth_user_id: { type: string }
+                            username: { type: string }
+                            display_name: { type: string, nullable: true }
+                            avatar_url: { type: string, nullable: true }
+                            total_trees: { type: integer }
 
   # ========= SHARES =========
   /shares/profile:

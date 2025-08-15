@@ -15,8 +15,12 @@ import (
 	"github.com/4planet/backend/internal/middleware"
 	"github.com/4planet/backend/internal/models"
 	"github.com/4planet/backend/pkg/auth"
+	"github.com/4planet/backend/pkg/donations"
 	"github.com/4planet/backend/pkg/mailer"
 	"github.com/4planet/backend/pkg/payments"
+	"github.com/4planet/backend/pkg/projects"
+	"github.com/4planet/backend/pkg/subscriptions"
+	"github.com/4planet/backend/pkg/user"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
@@ -43,6 +47,10 @@ func main() {
 
 	// Initialize services
 	authService := auth.NewService()
+	userService := user.NewService()
+	donationService := donations.NewService()
+	subscriptionService := subscriptions.NewService()
+	projectsService := projects.NewService()
 
 	var mailerService mailer.Mailer
 	if cfg.SMTP.Host != "" {
@@ -65,6 +73,8 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, mailerService, cfg)
+	userHandler := handlers.NewUserHandler(userService, donationService, subscriptionService)
+	projectsHandler := handlers.NewProjectsHandler(projectsService, cfg)
 
 	// Set Gin mode
 	if cfg.Log.Level == "debug" {
@@ -91,11 +101,26 @@ func main() {
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/logout", middleware.RequireAuth(authService, cfg), authHandler.Logout)
-			auth.GET("/me", middleware.RequireAuth(authService, cfg), authHandler.Me)
 			auth.POST("/verify-email/request", middleware.RequireAuth(authService, cfg), authHandler.RequestVerificationEmail)
 			auth.POST("/verify-email/confirm", authHandler.ConfirmEmail)
 			auth.POST("/password/forgot", authHandler.ForgotPassword)
 			auth.POST("/password/reset", authHandler.ResetPassword)
+		}
+
+		// User profile and data (requires authentication)
+		me := v1.Group("/me")
+		me.Use(middleware.RequireAuth(authService, cfg))
+		{
+			me.GET("", userHandler.Me)
+			me.GET("/donations", userHandler.GetMyDonations)
+			me.GET("/subscriptions", userHandler.GetMySubscriptions)
+		}
+
+		// Projects
+		projects := v1.Group("/projects")
+		{
+			projects.GET("", projectsHandler.GetProjects)
+			projects.GET("/:id", projectsHandler.GetProject)
 		}
 
 		// Donations & Payments
@@ -108,12 +133,6 @@ func main() {
 		v1.POST("/subscriptions/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
 			// TODO: Implement subscription intent handler
 			c.JSON(http.StatusOK, gin.H{"message": "Subscription intent endpoint"})
-		})
-
-		// Projects
-		v1.GET("/projects", func(c *gin.Context) {
-			// TODO: Implement projects list handler
-			c.JSON(http.StatusOK, gin.H{"message": "Projects endpoint"})
 		})
 
 		// News

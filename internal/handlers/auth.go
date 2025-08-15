@@ -206,17 +206,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// Me returns the current authenticated user
-func (h *AuthHandler) Me(c *gin.Context) {
-	user, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
-}
-
 // RequestVerificationEmail handles requesting a new verification email
 func (h *AuthHandler) RequestVerificationEmail(c *gin.Context) {
 	user, exists := c.Get("user")
