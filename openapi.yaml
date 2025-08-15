@@ -526,7 +526,31 @@ paths:
     get:
       summary: Current price per tree by currency
       responses:
-        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/TreePrice' } } } } }
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: integer
+                  description: Price in minor units (e.g., 2500 = $25.00)
+                example:
+                  RUB: 1900
+                  KZT: 950
+                  USD: 2500
+                  EUR: 2300
+  /prices/{currency}:
+    get:
+      summary: Get tree price for specific currency
+      parameters:
+        - name: currency
+          in: path
+          required: true
+          schema: { type: string, enum: [RUB, KZT, USD, EUR] }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/TreePrice' } } } }
+        '404': { description: Price not found for currency, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
 
   # ========= LEADERBOARD =========
   /leaderboard:

@@ -130,9 +130,6 @@ func seedTreePrices(ctx context.Context, db *gorm.DB) error {
 		{Currency: "KZT", PriceMinor: 950},
 		{Currency: "USD", PriceMinor: 2500},
 		{Currency: "EUR", PriceMinor: 2300},
-		{Currency: "GBP", PriceMinor: 2000},
-		{Currency: "CNY", PriceMinor: 180},
-		{Currency: "JPY", PriceMinor: 2800},
 	}
 
 	for _, price := range prices {
