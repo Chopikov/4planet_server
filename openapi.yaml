@@ -131,6 +131,7 @@ components:
         id: { type: string, format: uuid }
         payment_id: { type: string, format: uuid }
         project_id: { type: string, format: uuid, nullable: true }
+        referral_user_id: { type: string, nullable: true, description: 'User ID who referred this donation' }
         trees_count: { type: integer }
         created_at: { type: string, format: date-time }
       required: [id, payment_id, trees_count, created_at]
@@ -176,6 +177,7 @@ components:
         fail_return_url: { type: string, format: uri }
         description: { type: string, nullable: true }
         project_id: { type: string, format: uuid, nullable: true, description: 'allocate donation to a specific project' }
+        referral_user_id: { type: string, nullable: true, description: 'User ID who referred this donation through a share link' }
     PaymentIntentResponse:
       type: object
       properties:
@@ -184,20 +186,40 @@ components:
         provider_payload: { type: object, additionalProperties: true }
     SubscriptionIntentRequest:
       type: object
-      required: [provider, amount_minor, currency]
+      required: [provider, amount_minor, currency, success_return_url, fail_return_url, interval, interval_count]
       properties:
         provider: { type: string, enum: [cloudpayments] }
-        amount_minor: { type: integer }
+        amount_minor: { type: integer, description: 'Amount in minor units (e.g., kopecks for RUB)' }
         currency: { $ref: '#/components/schemas/Currency' }
-        success_return_url: { type: string, format: uri }
-        fail_return_url: { type: string, format: uri }
-        project_id: { type: string, format: uuid, nullable: true, description: 'optional preferred project for this subscription' }
+        success_return_url: { type: string, format: uri, description: 'URL to redirect after successful subscription creation' }
+        fail_return_url: { type: string, format: uri, description: 'URL to redirect after failed subscription creation' }
+        description: { type: string, nullable: true, description: 'Optional description for the subscription' }
+        interval: { type: string, enum: [monthly, yearly], description: 'Subscription interval' }
+        interval_count: { type: integer, minimum: 1, description: 'Number of intervals (e.g., 3 for quarterly)' }
+        project_id: { type: string, format: uuid, nullable: true, description: 'Optional preferred project for this subscription' }
     SubscriptionIntentResponse:
       type: object
       properties:
         provider: { type: string, enum: [cloudpayments] }
         redirect_url: { type: string, format: uri }
         provider_payload: { type: object, additionalProperties: true }
+    ShareTokenResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        kind: { type: string, enum: [profile, donation] }
+        ref_id: { type: string, format: uuid, nullable: true }
+        url: { type: string, format: uri }
+        created_at: { type: string, format: date-time }
+      required: [id, slug, kind, url, created_at]
+    ReferralStats:
+      type: object
+      properties:
+        total_referrals: { type: integer, description: 'Total number of donations referred by this user' }
+        total_trees_planted: { type: integer, description: 'Total trees planted through referrals' }
+        recent_referrals: { type: array, items: { $ref: '#/components/schemas/Donation' }, description: 'Recent donations referred by this user' }
+      required: [total_referrals, total_trees_planted, recent_referrals]
 
 paths:
   # ========= AUTH (cookie-based) =========
@@ -409,6 +431,9 @@ paths:
                   currency: RUB
                   success_return_url: https://app.local/return/success
                   fail_return_url: https://app.local/return/fail
+                  description: "Monthly tree planting subscription"
+                  interval: monthly
+                  interval_count: 1
                   project_id: null
       responses:
         '200':
@@ -607,18 +632,22 @@ paths:
     post:
       summary: Create profile share link
       responses:
-        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ShareLink' } } } }
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ShareTokenResponse' } } } }
       security: [ { cookieAuth: [] } ]
-  /shares/donation/{donationId}:
+  /shares/donation:
     post:
       summary: Create donation share link
-      parameters:
-        - name: donationId
-          in: path
-          required: true
-          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [donation_id]
+              properties:
+                donation_id: { type: string, format: uuid }
       responses:
-        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ShareLink' } } } }
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/ShareTokenResponse' } } } }
       security: [ { cookieAuth: [] } ]
   /shares/resolve/{slug}:
     get:
@@ -636,17 +665,35 @@ paths:
               schema:
                 type: object
                 properties:
+                  slug: { type: string }
                   kind: { type: string, enum: [profile, donation] }
-                  payload:
-                    oneOf:
-                      - type: object
-                        properties:
-                          user: { $ref: '#/components/schemas/User' }
-                          badges: { type: array, items: { $ref: '#/components/schemas/Achievement' } }
-                      - type: object
-                        properties:
-                          donation: { $ref: '#/components/schemas/Donation' }
+                  referral_user_id: { type: string, description: 'User ID who created this share link' }
+                  ref_id: { type: string, format: uuid, nullable: true }
+                  created_at: { type: string, format: date-time }
         '404': { description: Not found }
+  /shares:
+    get:
+      summary: Get user's share tokens
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ShareTokenResponse' } } } } }
+      security: [ { cookieAuth: [] } ]
+  /shares/{id}:
+    delete:
+      summary: Delete a share token
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: No content }
+      security: [ { cookieAuth: [] } ]
+  /shares/stats:
+    get:
+      summary: Get user's referral statistics
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ReferralStats' } } } }
+      security: [ { cookieAuth: [] } ]
 
   # ========= ACHIEVEMENTS =========
   /badges:

@@ -229,7 +229,7 @@ type Subscription struct {
 	Meta                   interface{}        `gorm:"column:meta;type:jsonb;default:'{}'::jsonb"`
 
 	// Relationships
-	User     User      `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
+	User     User      `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE" json:"-"`
 	Payments []Payment `gorm:"foreignKey:SubscriptionID;constraint:OnDelete:SET NULL"`
 }
 
@@ -263,18 +263,20 @@ func (Payment) TableName() string {
 
 // Donation represents the donations table
 type Donation struct {
-	ID         uuid.UUID  `gorm:"column:id;primaryKey;type:uuid;default:gen_random_uuid()"`
-	AuthUserID string     `gorm:"column:auth_user_id;type:text;not null;index"`
-	PaymentID  uuid.UUID  `gorm:"column:payment_id;type:uuid;uniqueIndex;not null"`
-	ProjectID  *uuid.UUID `gorm:"column:project_id;type:uuid;index"`
-	TreesCount int        `gorm:"column:trees_count;type:integer;not null"`
-	CreatedAt  time.Time  `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
+	ID             uuid.UUID  `gorm:"column:id;primaryKey;type:uuid;default:gen_random_uuid()"`
+	AuthUserID     string     `gorm:"column:auth_user_id;type:text;not null;index"`
+	PaymentID      uuid.UUID  `gorm:"column:payment_id;type:uuid;uniqueIndex;not null"`
+	ProjectID      *uuid.UUID `gorm:"column:project_id;type:uuid;index"`
+	ReferralUserID *string    `gorm:"column:referral_user_id;type:text;index"`
+	TreesCount     int        `gorm:"column:trees_count;type:integer;not null"`
+	CreatedAt      time.Time  `gorm:"column:created_at;type:timestamptz;not null;default:now()"`
 
 	// Relationships
-	User        User         `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE"`
-	Payment     Payment      `gorm:"foreignKey:PaymentID;constraint:OnDelete:RESTRICT"`
-	Project     *Project     `gorm:"foreignKey:ProjectID;constraint:OnDelete:SET NULL"`
-	ShareTokens []ShareToken `gorm:"foreignKey:RefID;constraint:OnDelete:CASCADE"`
+	User         User         `gorm:"foreignKey:AuthUserID;constraint:OnDelete:CASCADE" json:"-"`
+	Payment      Payment      `gorm:"foreignKey:PaymentID;constraint:OnDelete:RESTRICT"`
+	Project      *Project     `gorm:"foreignKey:ProjectID;constraint:OnDelete:SET NULL" json:"-"`
+	ReferralUser *User        `gorm:"foreignKey:ReferralUserID;constraint:OnDelete:SET NULL" json:"-"`
+	ShareTokens  []ShareToken `gorm:"foreignKey:RefID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
 func (Donation) TableName() string {

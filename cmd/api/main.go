@@ -22,6 +22,7 @@ import (
 	"github.com/4planet/backend/pkg/payments"
 	"github.com/4planet/backend/pkg/prices"
 	"github.com/4planet/backend/pkg/projects"
+	"github.com/4planet/backend/pkg/shares"
 	"github.com/4planet/backend/pkg/subscriptions"
 	"github.com/4planet/backend/pkg/user"
 	"github.com/gin-gonic/gin"
@@ -57,6 +58,7 @@ func main() {
 	newsService := news.NewService()
 	pricesService := prices.NewService()
 	achievementsService := achievements.NewService()
+	sharesService := shares.NewService()
 
 	var mailerService mailer.Mailer
 	if cfg.SMTP.Host != "" {
@@ -84,6 +86,20 @@ func main() {
 	newsHandler := handlers.NewNewsHandler(newsService, cfg)
 	pricesHandler := handlers.NewPricesHandler(pricesService, cfg)
 	achievementsHandler := handlers.NewAchievementsHandler(achievementsService, cfg)
+
+	// Initialize share services and handlers
+	sharesHandler := handlers.NewSharesHandler(sharesService, cfg.App.BaseURL)
+
+	// Initialize payment services and handlers
+	paymentService := payments.NewCloudPaymentsService(
+		cfg.CloudPayments.PublicID,
+		cfg.CloudPayments.Secret,
+		cfg.App.BaseURL,
+	)
+	paymentsHandler := handlers.NewPaymentsHandler(paymentService)
+
+	// Initialize subscription handlers
+	subscriptionsHandler := handlers.NewSubscriptionsHandler(paymentService)
 
 	// Set Gin mode
 	if cfg.Log.Level == "debug" {
@@ -162,33 +178,37 @@ func main() {
 			users.GET("/leaderboard", userHandler.GetLeaderboard)
 		}
 
-		// Donations & Payments
-		v1.POST("/payments/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
-			// TODO: Implement payment intent handler
-			c.JSON(http.StatusOK, gin.H{"message": "Payment intent endpoint"})
-		})
+		// Payments
+		payments := v1.Group("/payments")
+		payments.Use(middleware.RequireAuth(authService, cfg))
+		{
+			payments.POST("/intents", paymentsHandler.CreatePaymentIntent)
+		}
 
 		// Subscriptions
-		v1.POST("/subscriptions/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
-			// TODO: Implement subscription intent handler
-			c.JSON(http.StatusOK, gin.H{"message": "Subscription intent endpoint"})
-		})
+		subscriptions := v1.Group("/subscriptions")
+		subscriptions.Use(middleware.RequireAuth(authService, cfg))
+		{
+			subscriptions.POST("/intents", subscriptionsHandler.CreateSubscriptionIntent)
+		}
 
 		// Shares
-		v1.POST("/shares/profile", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
-			// TODO: Implement profile share handler
-			c.JSON(http.StatusOK, gin.H{"message": "Profile share endpoint"})
-		})
+		shares := v1.Group("/shares")
+		{
+			// Public endpoint (no auth required)
+			shares.GET("/resolve/:slug", sharesHandler.ResolveShare)
 
-		v1.POST("/shares/donation/:donationId", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
-			// TODO: Implement donation share handler
-			c.JSON(http.StatusOK, gin.H{"message": "Donation share endpoint"})
-		})
-
-		v1.GET("/shares/resolve/:slug", func(c *gin.Context) {
-			// TODO: Implement share resolver handler
-			c.JSON(http.StatusOK, gin.H{"message": "Share resolver endpoint"})
-		})
+			// Protected endpoints (auth required)
+			sharesProtected := shares.Group("")
+			sharesProtected.Use(middleware.RequireAuth(authService, cfg))
+			{
+				sharesProtected.POST("/profile", sharesHandler.CreateProfileShare)
+				sharesProtected.POST("/donation", sharesHandler.CreateDonationShare)
+				sharesProtected.GET("", sharesHandler.GetMyShares)
+				sharesProtected.DELETE("/:id", sharesHandler.DeleteShare)
+				sharesProtected.GET("/stats", sharesHandler.GetReferralStats)
+			}
+		}
 	}
 
 	// Webhooks

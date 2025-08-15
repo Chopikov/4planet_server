@@ -75,3 +75,5 @@ tmp/
 # Admin interface files (uncomment if you want to ignore them)
 # web/admin/
 # web/docs/
+
+__debug_bin*

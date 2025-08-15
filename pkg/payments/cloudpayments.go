@@ -41,6 +41,7 @@ type PaymentIntentRequest struct {
 	FailReturnURL    string     `json:"fail_return_url"`
 	Description      *string    `json:"description,omitempty"`
 	ProjectID        *uuid.UUID `json:"project_id,omitempty"`
+	ReferralUserID   *string    `json:"referral_user_id,omitempty"`
 }
 
 // PaymentIntentResponse represents a payment intent response
@@ -58,6 +59,8 @@ type SubscriptionIntentRequest struct {
 	SuccessReturnURL string     `json:"success_return_url"`
 	FailReturnURL    string     `json:"fail_return_url"`
 	ProjectID        *uuid.UUID `json:"project_id,omitempty"`
+	IntervalMonths   int        `json:"interval_months"`
+	Description      *string    `json:"description,omitempty"`
 }
 
 // SubscriptionIntentResponse represents a subscription intent response
@@ -95,6 +98,7 @@ func (s *CloudPaymentsService) CreatePaymentIntent(req *PaymentIntentRequest, au
 			"fail_return_url":    req.FailReturnURL,
 			"description":        req.Description,
 			"project_id":         req.ProjectID,
+			"referral_user_id":   req.ReferralUserID,
 		},
 	}
 
@@ -136,12 +140,13 @@ func (s *CloudPaymentsService) CreateSubscriptionIntent(req *SubscriptionIntentR
 		Provider:       models.PaymentProviderCloudPayments,
 		AmountMinor:    req.AmountMinor,
 		Currency:       models.Currency(req.Currency),
-		IntervalMonths: 1,
+		IntervalMonths: req.IntervalMonths,
 		Status:         models.SubscriptionStatusIncomplete,
 		Meta: map[string]interface{}{
 			"success_return_url": req.SuccessReturnURL,
 			"fail_return_url":    req.FailReturnURL,
 			"project_id":         req.ProjectID,
+			"description":        req.Description,
 		},
 	}
 
@@ -152,15 +157,31 @@ func (s *CloudPaymentsService) CreateSubscriptionIntent(req *SubscriptionIntentR
 	// Generate redirect URL (in production, this would be the actual CloudPayments subscription URL)
 	redirectURL := fmt.Sprintf("%s/subscribe/%s", s.baseURL, subscription.ID.String())
 
+	// Determine interval description
+	intervalDesc := "monthly"
+	if req.IntervalMonths > 1 {
+		if req.IntervalMonths == 12 {
+			intervalDesc = "yearly"
+		} else {
+			intervalDesc = fmt.Sprintf("every %d months", req.IntervalMonths)
+		}
+	}
+
 	// Create provider payload
 	providerPayload := map[string]interface{}{
-		"publicId":       s.publicID,
-		"amount":         req.AmountMinor,
-		"currency":       req.Currency,
-		"description":    "Monthly tree planting subscription",
+		"publicId": s.publicID,
+		"amount":   req.AmountMinor,
+		"currency": req.Currency,
+		"description": func() string {
+			if req.Description != nil {
+				return *req.Description
+			}
+			return fmt.Sprintf("%s tree planting subscription", intervalDesc)
+		}(),
 		"accountId":      authUserID,
 		"subscriptionId": subscription.ID.String(),
-		"interval":       "monthly",
+		"interval":       intervalDesc,
+		"intervalMonths": req.IntervalMonths,
 	}
 
 	return &SubscriptionIntentResponse{
@@ -337,6 +358,7 @@ func (s *CloudPaymentsService) createDonation(payment *models.Payment) error {
 
 	// Get project ID from payment meta if available
 	var projectID *uuid.UUID
+	var referralUserID *string
 	if meta, ok := payment.Meta.(map[string]interface{}); ok {
 		if projectIDStr, exists := meta["project_id"]; exists && projectIDStr != nil {
 			if id, ok := projectIDStr.(string); ok {
@@ -345,17 +367,24 @@ func (s *CloudPaymentsService) createDonation(payment *models.Payment) error {
 				}
 			}
 		}
+		// Get referral user ID from payment meta if available
+		if refUserID, exists := meta["referral_user_id"]; exists && refUserID != nil {
+			if id, ok := refUserID.(string); ok {
+				referralUserID = &id
+			}
+		}
 	}
 
 	// Create donation in a transaction
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		// Create donation
 		donation := &models.Donation{
-			ID:         uuid.New(),
-			AuthUserID: *payment.AuthUserID,
-			PaymentID:  payment.ID,
-			ProjectID:  projectID,
-			TreesCount: treesCount,
+			ID:             uuid.New(),
+			AuthUserID:     *payment.AuthUserID,
+			PaymentID:      payment.ID,
+			ProjectID:      projectID,
+			ReferralUserID: referralUserID,
+			TreesCount:     treesCount,
 		}
 
 		if err := tx.Create(donation).Error; err != nil {
