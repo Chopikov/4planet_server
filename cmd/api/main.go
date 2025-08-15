@@ -17,6 +17,7 @@ import (
 	"github.com/4planet/backend/pkg/auth"
 	"github.com/4planet/backend/pkg/donations"
 	"github.com/4planet/backend/pkg/mailer"
+	"github.com/4planet/backend/pkg/news"
 	"github.com/4planet/backend/pkg/payments"
 	"github.com/4planet/backend/pkg/projects"
 	"github.com/4planet/backend/pkg/subscriptions"
@@ -51,6 +52,7 @@ func main() {
 	donationService := donations.NewService()
 	subscriptionService := subscriptions.NewService()
 	projectsService := projects.NewService()
+	newsService := news.NewService()
 
 	var mailerService mailer.Mailer
 	if cfg.SMTP.Host != "" {
@@ -75,6 +77,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService, mailerService, cfg)
 	userHandler := handlers.NewUserHandler(userService, donationService, subscriptionService)
 	projectsHandler := handlers.NewProjectsHandler(projectsService, cfg)
+	newsHandler := handlers.NewNewsHandler(newsService, cfg)
 
 	// Set Gin mode
 	if cfg.Log.Level == "debug" {
@@ -123,6 +126,12 @@ func main() {
 			projects.GET("/:id", projectsHandler.GetProject)
 		}
 
+		news := v1.Group("/news")
+		{
+			news.GET("", newsHandler.GetNews)
+			news.GET("/:id", newsHandler.GetNewsItem)
+		}
+
 		// Donations & Payments
 		v1.POST("/payments/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
 			// TODO: Implement payment intent handler
@@ -133,12 +142,6 @@ func main() {
 		v1.POST("/subscriptions/intents", middleware.RequireAuth(authService, cfg), func(c *gin.Context) {
 			// TODO: Implement subscription intent handler
 			c.JSON(http.StatusOK, gin.H{"message": "Subscription intent endpoint"})
-		})
-
-		// News
-		v1.GET("/news", func(c *gin.Context) {
-			// TODO: Implement news handler
-			c.JSON(http.StatusOK, gin.H{"message": "News endpoint"})
 		})
 
 		// Prices

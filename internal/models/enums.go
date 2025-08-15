@@ -47,6 +47,22 @@ const (
 	NewsTypeUpdate      NewsType = "update"
 )
 
+// IsValid checks if the NewsType value is valid
+func (nt NewsType) IsValid() bool {
+	switch nt {
+	case NewsTypeAchievement, NewsTypeInvite, NewsTypeUpdate:
+		return true
+	default:
+		return false
+	}
+}
+
+// ParseNewsType safely parses a string to NewsType, returning false if invalid
+func ParseNewsType(s string) (NewsType, bool) {
+	nt := NewsType(s)
+	return nt, nt.IsValid()
+}
+
 func (nt NewsType) String() string {
 	return string(nt)
 }
