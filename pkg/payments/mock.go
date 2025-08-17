@@ -14,17 +14,19 @@ import (
 
 // MockPaymentService handles mock payment integration for testing
 type MockPaymentService struct {
-	db      *gorm.DB
-	baseURL string
-	texts   PaymentTexts
+	db              *gorm.DB
+	baseURL         string
+	texts           PaymentTexts
+	donationService *DonationService
 }
 
 // NewMockPaymentService creates a new mock payment service
 func NewMockPaymentService(baseURL string, paymentTexts PaymentTexts) *MockPaymentService {
 	return &MockPaymentService{
-		db:      database.GetDB(),
-		baseURL: baseURL,
-		texts:   paymentTexts,
+		db:              database.GetDB(),
+		baseURL:         baseURL,
+		texts:           paymentTexts,
+		donationService: NewDonationService(),
 	}
 }
 
@@ -48,8 +50,9 @@ func (s *MockPaymentService) CreatePaymentIntent(req *PaymentIntentRequest, auth
 		Currency:          models.Currency(req.Currency),
 		Status:            models.PaymentStatusPending,
 		Meta: map[string]interface{}{
-			"description": req.Description,
-			"project_id":  req.ProjectID,
+			"description":      req.Description,
+			"project_id":       req.ProjectID,
+			"referral_user_id": req.ReferralUserID,
 		},
 		CreatedAt: time.Now(),
 	}
@@ -234,26 +237,37 @@ func (s *MockPaymentService) processPaymentWebhook(paymentID uuid.UUID, status s
 		return fmt.Errorf("payment not found: %w", err)
 	}
 
-	// Update payment status
-	switch status {
-	case "completed":
-		payment.Status = models.PaymentStatusSucceeded
-		payment.OccurredAt = &time.Time{}
-		*payment.OccurredAt = time.Now()
-	case "failed":
-		payment.Status = models.PaymentStatusFailed
-	case "cancelled":
-		payment.Status = models.PaymentStatusCanceled
-	default:
-		return fmt.Errorf("unknown payment status: %s", status)
-	}
+	// Update payment status and create donation in a single transaction
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Update payment status
+		switch status {
+		case "completed":
+			payment.Status = models.PaymentStatusSucceeded
+			payment.OccurredAt = &time.Time{}
+			*payment.OccurredAt = time.Now()
+		case "failed":
+			payment.Status = models.PaymentStatusFailed
+		case "cancelled":
+			payment.Status = models.PaymentStatusCanceled
+		default:
+			return fmt.Errorf("unknown payment status: %s", status)
+		}
 
-	if err := s.db.Save(&payment).Error; err != nil {
-		return fmt.Errorf("failed to update payment: %w", err)
-	}
+		// Save payment status
+		if err := tx.Save(&payment).Error; err != nil {
+			return fmt.Errorf("failed to update payment: %w", err)
+		}
 
-	log.Printf("Mock payment %s status updated to: %s", paymentID, status)
-	return nil
+		// Create donation if payment succeeded
+		if status == "completed" {
+			if err := s.donationService.CreateDonationFromPayment(&payment); err != nil {
+				return fmt.Errorf("failed to create donation: %w", err)
+			}
+		}
+
+		log.Printf("Mock payment %s status updated to: %s", paymentID, status)
+		return nil
+	})
 }
 
 // processSubscriptionWebhook processes a subscription webhook

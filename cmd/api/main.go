@@ -193,6 +193,7 @@ func main() {
 			me.GET("/donations", userHandler.GetMyDonations)
 			me.GET("/subscriptions", userHandler.GetMySubscriptions)
 			me.GET("/achievements", userHandler.GetMyAchievements)
+			me.GET("/referral-stats", sharesHandler.GetReferralStats)
 		}
 
 		// User leaderboard (requires authentication)
@@ -262,7 +263,6 @@ func main() {
 				sharesProtected.POST("/donation", sharesHandler.CreateDonationShare)
 				sharesProtected.GET("", sharesHandler.GetMyShares)
 				sharesProtected.DELETE("/:id", sharesHandler.DeleteShare)
-				sharesProtected.GET("/stats", sharesHandler.GetReferralStats)
 			}
 		}
 	}

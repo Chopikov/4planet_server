@@ -17,21 +17,23 @@ import (
 
 // CloudPaymentsService handles CloudPayments integration
 type CloudPaymentsService struct {
-	db       *gorm.DB
-	publicID string
-	secret   string
-	baseURL  string
-	texts    PaymentTexts
+	db              *gorm.DB
+	publicID        string
+	secret          string
+	baseURL         string
+	texts           PaymentTexts
+	donationService *DonationService
 }
 
 // NewCloudPaymentsService creates a new CloudPayments service
 func NewCloudPaymentsService(publicID, secret, baseURL string, paymentTexts PaymentTexts) *CloudPaymentsService {
 	return &CloudPaymentsService{
-		db:       database.GetDB(),
-		publicID: publicID,
-		secret:   secret,
-		baseURL:  baseURL,
-		texts:    paymentTexts,
+		db:              database.GetDB(),
+		publicID:        publicID,
+		secret:          secret,
+		baseURL:         baseURL,
+		texts:           paymentTexts,
+		donationService: NewDonationService(),
 	}
 }
 
@@ -297,7 +299,7 @@ func (s *CloudPaymentsService) processPaymentEvent(payload *WebhookPayload) erro
 	}
 
 	// Create donation
-	return s.createDonation(&payment)
+	return s.donationService.CreateDonationFromPayment(&payment)
 }
 
 // processSubscriptionChargeEvent processes a subscription charge event
@@ -340,7 +342,7 @@ func (s *CloudPaymentsService) processSubscriptionChargeEvent(payload *WebhookPa
 	}
 
 	// Create donation
-	return s.createDonation(payment)
+	return s.donationService.CreateDonationFromPayment(payment)
 }
 
 // processRefundEvent processes a refund event
@@ -360,67 +362,6 @@ func (s *CloudPaymentsService) processRefundEvent(payload *WebhookPayload) error
 	}
 
 	return s.db.Model(&payment).Updates(updates).Error
-}
-
-// createDonation creates a donation record and updates user counters
-func (s *CloudPaymentsService) createDonation(payment *models.Payment) error {
-	// Get tree price for the payment currency
-	var treePrice models.TreePrice
-	if err := s.db.Where("currency = ?", payment.Currency).First(&treePrice).Error; err != nil {
-		return fmt.Errorf("tree price not found for currency %s: %w", payment.Currency, err)
-	}
-
-	// Calculate trees count
-	treesCount := int(payment.AmountMinor / treePrice.PriceMinor)
-
-	// Get project ID from payment meta if available
-	var projectID *uuid.UUID
-	var referralUserID *string
-	if meta, ok := payment.Meta.(map[string]interface{}); ok {
-		if projectIDStr, exists := meta["project_id"]; exists && projectIDStr != nil {
-			if id, ok := projectIDStr.(string); ok {
-				if parsedID, err := uuid.Parse(id); err == nil {
-					projectID = &parsedID
-				}
-			}
-		}
-		// Get referral user ID from payment meta if available
-		if refUserID, exists := meta["referral_user_id"]; exists && refUserID != nil {
-			if id, ok := refUserID.(string); ok {
-				referralUserID = &id
-			}
-		}
-	}
-
-	// Create donation in a transaction
-	return s.db.Transaction(func(tx *gorm.DB) error {
-		// Create donation
-		donation := &models.Donation{
-			ID:             uuid.New(),
-			AuthUserID:     *payment.AuthUserID,
-			PaymentID:      payment.ID,
-			ProjectID:      projectID,
-			ReferralUserID: referralUserID,
-			TreesCount:     treesCount,
-		}
-
-		if err := tx.Create(donation).Error; err != nil {
-			return fmt.Errorf("failed to create donation: %w", err)
-		}
-
-		// Update user counters
-		updates := map[string]interface{}{
-			"total_trees":      gorm.Expr("total_trees + ?", treesCount),
-			"donations_count":  gorm.Expr("donations_count + 1"),
-			"last_donation_at": time.Now(),
-		}
-
-		if err := tx.Model(&models.User{}).Where("auth_user_id = ?", *payment.AuthUserID).Updates(updates).Error; err != nil {
-			return fmt.Errorf("failed to update user counters: %w", err)
-		}
-
-		return nil
-	})
 }
 
 // verifySignature verifies the webhook signature
