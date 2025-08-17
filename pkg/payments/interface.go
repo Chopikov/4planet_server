@@ -37,6 +37,7 @@ type PaymentProviderConfig struct {
 	Secret       string
 	BaseURL      string
 	Enabled      bool
+	PaymentTexts PaymentTexts
 }
 
 // NewPaymentProviderFactory creates a new factory with provider configurations
@@ -59,7 +60,7 @@ func (f *PaymentProviderFactory) CreateService(providerName string) (PaymentServ
 
 	switch providerName {
 	case "cloudpayments":
-		return NewCloudPaymentsService(config.PublicID, config.Secret, config.BaseURL), nil
+		return NewCloudPaymentsService(config.PublicID, config.Secret, config.BaseURL, config.PaymentTexts), nil
 	// Add more providers here as they become available
 	// case "stripe":
 	//     return NewStripeService(config.PublicID, config.Secret, config.BaseURL), nil

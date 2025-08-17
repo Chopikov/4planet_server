@@ -20,15 +20,17 @@ type CloudPaymentsService struct {
 	publicID string
 	secret   string
 	baseURL  string
+	texts    PaymentTexts
 }
 
 // NewCloudPaymentsService creates a new CloudPayments service
-func NewCloudPaymentsService(publicID, secret, baseURL string) *CloudPaymentsService {
+func NewCloudPaymentsService(publicID, secret, baseURL string, paymentTexts PaymentTexts) *CloudPaymentsService {
 	return &CloudPaymentsService{
 		db:       database.GetDB(),
 		publicID: publicID,
 		secret:   secret,
 		baseURL:  baseURL,
+		texts:    paymentTexts,
 	}
 }
 
@@ -123,7 +125,7 @@ func (s *CloudPaymentsService) CreatePaymentIntent(req *PaymentIntentRequest, au
 			if req.Description != nil {
 				return *req.Description
 			}
-			return "Tree planting donation"
+			return s.texts.DefaultDonationDescription
 		}(),
 		"accountId": authUserID,
 		"paymentId": payment.ID.String(),
@@ -163,12 +165,12 @@ func (s *CloudPaymentsService) CreateSubscriptionIntent(req *SubscriptionIntentR
 	redirectURL := fmt.Sprintf("%s/subscribe/%s", s.baseURL, subscription.ID.String())
 
 	// Determine interval description
-	intervalDesc := "monthly"
+	intervalDesc := s.texts.SubscriptionDescriptions.Monthly
 	if req.IntervalMonths > 1 {
 		if req.IntervalMonths == 12 {
-			intervalDesc = "yearly"
+			intervalDesc = s.texts.SubscriptionDescriptions.Yearly
 		} else {
-			intervalDesc = fmt.Sprintf("every %d months", req.IntervalMonths)
+			intervalDesc = fmt.Sprintf(s.texts.SubscriptionDescriptions.Custom, req.IntervalMonths)
 		}
 	}
 
@@ -181,7 +183,7 @@ func (s *CloudPaymentsService) CreateSubscriptionIntent(req *SubscriptionIntentR
 			if req.Description != nil {
 				return *req.Description
 			}
-			return fmt.Sprintf("%s tree planting subscription", intervalDesc)
+			return fmt.Sprintf("%s %s", intervalDesc, s.texts.BaseSubscriptionDescription)
 		}(),
 		"accountId":      authUserID,
 		"subscriptionId": subscription.ID.String(),

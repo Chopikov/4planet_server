@@ -31,9 +31,32 @@ type Config struct {
 		From     string
 	}
 
+	Email struct {
+		Subjects struct {
+			Verification  string
+			PasswordReset string
+		}
+		URLs struct {
+			BaseURL       string
+			VerifyEmail   string
+			ResetPassword string
+		}
+		TeamName string
+	}
+
 	CloudPayments struct {
 		PublicID string
 		Secret   string
+	}
+
+	Payments struct {
+		DefaultDonationDescription  string
+		BaseSubscriptionDescription string
+		SubscriptionDescriptions    struct {
+			Monthly string
+			Yearly  string
+			Custom  string
+		}
 	}
 
 	Log struct {
@@ -72,9 +95,24 @@ func Load() (*Config, error) {
 	config.SMTP.Password = getEnv("SMTP_PASSWORD", "")
 	config.SMTP.From = getEnv("SMTP_FROM", "noreply@4planet.local")
 
+	// Email config
+	config.Email.Subjects.Verification = getEnv("EMAIL_VERIFICATION_SUBJECT", "Verify your email address")
+	config.Email.Subjects.PasswordReset = getEnv("EMAIL_PASSWORD_RESET_SUBJECT", "Password reset request")
+	config.Email.URLs.BaseURL = getEnv("APP_BASE_URL", "http://localhost:8080")
+	config.Email.URLs.VerifyEmail = getEnv("EMAIL_VERIFY_EMAIL_URL", "/verify-email")
+	config.Email.URLs.ResetPassword = getEnv("EMAIL_RESET_PASSWORD_URL", "/reset-password")
+	config.Email.TeamName = getEnv("EMAIL_TEAM_NAME", "Planet")
+
 	// CloudPayments config
 	config.CloudPayments.PublicID = getEnv("CLOUDPAYMENTS_PUBLIC_ID", "")
 	config.CloudPayments.Secret = getEnv("CLOUDPAYMENTS_SECRET", "")
+
+	// Payments config
+	config.Payments.DefaultDonationDescription = getEnv("PAYMENTS_DEFAULT_DONATION_DESCRIPTION", "Donation to Planet")
+	config.Payments.BaseSubscriptionDescription = getEnv("PAYMENTS_BASE_SUBSCRIPTION_DESCRIPTION", "Subscription to Planet")
+	config.Payments.SubscriptionDescriptions.Monthly = getEnv("PAYMENTS_SUBSCRIPTION_MONTHLY_DESCRIPTION", "Monthly subscription")
+	config.Payments.SubscriptionDescriptions.Yearly = getEnv("PAYMENTS_SUBSCRIPTION_YEARLY_DESCRIPTION", "Yearly subscription")
+	config.Payments.SubscriptionDescriptions.Custom = getEnv("PAYMENTS_SUBSCRIPTION_CUSTOM_DESCRIPTION", "Custom subscription")
 
 	// Log config
 	config.Log.Level = getEnv("LOG_LEVEL", "info")

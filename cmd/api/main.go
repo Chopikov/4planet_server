@@ -59,6 +59,18 @@ func main() {
 			cfg.SMTP.User,
 			cfg.SMTP.Password,
 			cfg.SMTP.From,
+			mailer.EmailTexts{
+				Subjects: mailer.EmailSubjects{
+					Verification:  cfg.Email.Subjects.Verification,
+					PasswordReset: cfg.Email.Subjects.PasswordReset,
+				},
+				URLs: mailer.EmailURLs{
+					BaseURL:       cfg.Email.URLs.BaseURL,
+					VerifyEmail:   cfg.Email.URLs.VerifyEmail,
+					ResetPassword: cfg.Email.URLs.ResetPassword,
+				},
+				TeamName: cfg.Email.TeamName,
+			},
 		)
 	} else {
 		mailerService = mailer.NewNoOpMailer()
@@ -99,6 +111,15 @@ func main() {
 			Secret:       cfg.CloudPayments.Secret,
 			BaseURL:      cfg.App.BaseURL,
 			Enabled:      true,
+			PaymentTexts: payments.PaymentTexts{
+				DefaultDonationDescription:  cfg.Payments.DefaultDonationDescription,
+				BaseSubscriptionDescription: cfg.Payments.BaseSubscriptionDescription,
+				SubscriptionDescriptions: payments.SubscriptionDescriptions{
+					Monthly: cfg.Payments.SubscriptionDescriptions.Monthly,
+					Yearly:  cfg.Payments.SubscriptionDescriptions.Yearly,
+					Custom:  cfg.Payments.SubscriptionDescriptions.Custom,
+				},
+			},
 		},
 		// Add more providers here as they become available
 		// "stripe": {

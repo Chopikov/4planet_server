@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
+	"github.com/4planet/backend/internal/config"
 	"github.com/4planet/backend/internal/database"
 	"github.com/4planet/backend/internal/models"
 	"github.com/google/uuid"
@@ -20,14 +20,14 @@ func main() {
 		log.Println("No .env file found, using system environment variables")
 	}
 
-	// Get database connection string
-	dsn := os.Getenv("DB_DSN")
-	if dsn == "" {
-		dsn = "postgres://postgres:postgres@localhost:5432/planet?sslmode=disable"
+	// Load configuration
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
 	// Connect to database without auto-migration
-	if err := database.ConnectWithoutMigration(dsn); err != nil {
+	if err := database.ConnectWithoutMigration(cfg.Database.DSN); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer database.Close()

@@ -13,23 +13,25 @@ type Mailer interface {
 	SendPasswordResetEmail(to, token string) error
 }
 
-// SMTPMailer implements Mailer interface using SMTP
+// SMTPMailer handles email sending via SMTP
 type SMTPMailer struct {
 	host     string
 	port     int
 	username string
 	password string
 	from     string
+	texts    EmailTexts
 }
 
 // NewSMTPMailer creates a new SMTP mailer
-func NewSMTPMailer(host string, port int, username, password, from string) *SMTPMailer {
+func NewSMTPMailer(host string, port int, username, password, from string, emailTexts EmailTexts) *SMTPMailer {
 	return &SMTPMailer{
 		host:     host,
 		port:     port,
 		username: username,
 		password: password,
 		from:     from,
+		texts:    emailTexts,
 	}
 }
 
@@ -53,42 +55,42 @@ func (m *SMTPMailer) SendEmail(to, subject, body string) error {
 
 // SendVerificationEmail sends an email verification email
 func (m *SMTPMailer) SendVerificationEmail(to, token string) error {
-	subject := "Verify your email address"
+	subject := m.texts.Subjects.Verification
 	body := fmt.Sprintf(`
 Hello!
 
 Please verify your email address by clicking the following link:
 
-https://4planet.local/verify-email?token=%s
+%s%s?token=%s
 
 This link will expire in 24 hours.
 
 If you didn't create an account, please ignore this email.
 
 Best regards,
-4Planet Team
-`, token)
+%s
+`, m.texts.URLs.BaseURL, m.texts.URLs.VerifyEmail, token, m.texts.TeamName)
 
 	return m.SendEmail(to, subject, strings.TrimSpace(body))
 }
 
 // SendPasswordResetEmail sends a password reset email
 func (m *SMTPMailer) SendPasswordResetEmail(to, token string) error {
-	subject := "Reset your password"
+	subject := m.texts.Subjects.PasswordReset
 	body := fmt.Sprintf(`
 Hello!
 
 You requested to reset your password. Click the following link to set a new password:
 
-https://4planet.local/reset-password?token=%s
+%s%s?token=%s
 
 This link will expire in 1 hour.
 
 If you didn't request a password reset, please ignore this email.
 
 Best regards,
-4Planet Team
-`, token)
+%s
+`, m.texts.URLs.BaseURL, m.texts.URLs.ResetPassword, token, m.texts.TeamName)
 
 	return m.SendEmail(to, subject, strings.TrimSpace(body))
 }
