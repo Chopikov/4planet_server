@@ -383,6 +383,32 @@ paths:
         '204': { description: Password reset }
 
   # ========= DONATIONS & PAYMENTS =========
+  /payments/providers:
+    get:
+      summary: Get list of supported payment providers
+      responses:
+        '200':
+          description: List of supported payment providers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string, description: 'Provider name (e.g., cloudpayments)' }
+                        enabled: { type: boolean, description: 'Whether the provider is enabled' }
+                      required: [name, enabled]
+                required: [providers]
+              examples:
+                default:
+                  value:
+                    providers:
+                      - name: cloudpayments
+                        enabled: true
   /payments/intents:
     post:
       summary: Create intent for one-time payment
@@ -399,7 +425,9 @@ paths:
                   currency: RUB
                   success_return_url: https://app.local/return/success
                   fail_return_url: https://app.local/return/fail
+                  description: "Tree planting donation"
                   project_id: null
+                  referral_user_id: null
       responses:
         '200':
           description: Intent created

@@ -9,13 +9,13 @@ import (
 
 // SubscriptionsHandler handles subscription-related requests
 type SubscriptionsHandler struct {
-	paymentService *payments.CloudPaymentsService
+	paymentFactory *payments.PaymentProviderFactory
 }
 
 // NewSubscriptionsHandler creates a new subscriptions handler
-func NewSubscriptionsHandler(paymentService *payments.CloudPaymentsService) *SubscriptionsHandler {
+func NewSubscriptionsHandler(paymentFactory *payments.PaymentProviderFactory) *SubscriptionsHandler {
 	return &SubscriptionsHandler{
-		paymentService: paymentService,
+		paymentFactory: paymentFactory,
 	}
 }
 
@@ -54,6 +54,13 @@ func (h *SubscriptionsHandler) CreateSubscriptionIntent(c *gin.Context) {
 		intervalMonths = req.IntervalCount * 12
 	}
 
+	// Get the payment service for the specified provider
+	paymentService, err := h.paymentFactory.CreateService(req.Provider)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported payment provider"})
+		return
+	}
+
 	// Create subscription intent request
 	subscriptionReq := &payments.SubscriptionIntentRequest{
 		Provider:         req.Provider,
@@ -65,8 +72,8 @@ func (h *SubscriptionsHandler) CreateSubscriptionIntent(c *gin.Context) {
 		Description:      req.Description,
 	}
 
-	// Create subscription intent using CloudPayments service
-	response, err := h.paymentService.CreateSubscriptionIntent(subscriptionReq, authUserID)
+	// Create subscription intent using the selected payment service
+	response, err := paymentService.CreateSubscriptionIntent(subscriptionReq, authUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create subscription intent"})
 		return

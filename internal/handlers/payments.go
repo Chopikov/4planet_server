@@ -10,13 +10,13 @@ import (
 
 // PaymentsHandler handles payment-related requests
 type PaymentsHandler struct {
-	paymentService *payments.CloudPaymentsService
+	paymentFactory *payments.PaymentProviderFactory
 }
 
 // NewPaymentsHandler creates a new payments handler
-func NewPaymentsHandler(paymentService *payments.CloudPaymentsService) *PaymentsHandler {
+func NewPaymentsHandler(paymentFactory *payments.PaymentProviderFactory) *PaymentsHandler {
 	return &PaymentsHandler{
-		paymentService: paymentService,
+		paymentFactory: paymentFactory,
 	}
 }
 
@@ -48,6 +48,13 @@ func (h *PaymentsHandler) CreatePaymentIntent(c *gin.Context) {
 		}
 	}
 
+	// Get the payment service for the specified provider
+	paymentService, err := h.paymentFactory.CreateService(req.Provider)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported payment provider"})
+		return
+	}
+
 	paymentReq := &payments.PaymentIntentRequest{
 		Provider:         req.Provider,
 		AmountMinor:      req.AmountMinor,
@@ -59,11 +66,29 @@ func (h *PaymentsHandler) CreatePaymentIntent(c *gin.Context) {
 		ReferralUserID:   req.ReferralUserID,
 	}
 
-	response, err := h.paymentService.CreatePaymentIntent(paymentReq, authUserID)
+	response, err := paymentService.CreatePaymentIntent(paymentReq, authUserID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create payment intent"})
 		return
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// GetSupportedProviders returns a list of supported payment providers
+func (h *PaymentsHandler) GetSupportedProviders(c *gin.Context) {
+	providers := h.paymentFactory.GetSupportedProviders()
+
+	// Get provider details for each supported provider
+	var providerDetails []gin.H
+	for _, providerName := range providers {
+		providerDetails = append(providerDetails, gin.H{
+			"name":    providerName,
+			"enabled": true,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"providers": providerDetails,
+	})
 }

@@ -49,17 +49,8 @@ func main() {
 	}
 	defer database.Close()
 
-	// Initialize services
+	// Auth Entity
 	authService := auth.NewService()
-	userService := user.NewService()
-	donationService := donations.NewService()
-	subscriptionService := subscriptions.NewService()
-	projectsService := projects.NewService()
-	newsService := news.NewService()
-	pricesService := prices.NewService()
-	achievementsService := achievements.NewService()
-	sharesService := shares.NewService()
-
 	var mailerService mailer.Mailer
 	if cfg.SMTP.Host != "" {
 		mailerService = mailer.NewSMTPMailer(
@@ -72,34 +63,56 @@ func main() {
 	} else {
 		mailerService = mailer.NewNoOpMailer()
 	}
-
-	_ = payments.NewCloudPaymentsService(
-		cfg.CloudPayments.PublicID,
-		cfg.CloudPayments.Secret,
-		cfg.App.BaseURL,
-	)
-
-	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService, mailerService, cfg)
+
+	// User Entity
+	userService := user.NewService()
+	donationService := donations.NewService()
+	subscriptionService := subscriptions.NewService()
+	achievementsService := achievements.NewService()
 	userHandler := handlers.NewUserHandler(userService, donationService, subscriptionService, achievementsService)
+
+	// Projects Entity
+	projectsService := projects.NewService()
 	projectsHandler := handlers.NewProjectsHandler(projectsService, cfg)
+
+	// News Entity
+	newsService := news.NewService()
 	newsHandler := handlers.NewNewsHandler(newsService, cfg)
+
+	// Prices Entity
+	pricesService := prices.NewService()
 	pricesHandler := handlers.NewPricesHandler(pricesService, cfg)
+
+	// Achievements Entity
 	achievementsHandler := handlers.NewAchievementsHandler(achievementsService, cfg)
 
-	// Initialize share services and handlers
+	// Shares Entity
+	sharesService := shares.NewService()
 	sharesHandler := handlers.NewSharesHandler(sharesService, cfg.App.BaseURL)
 
-	// Initialize payment services and handlers
-	paymentService := payments.NewCloudPaymentsService(
-		cfg.CloudPayments.PublicID,
-		cfg.CloudPayments.Secret,
-		cfg.App.BaseURL,
-	)
-	paymentsHandler := handlers.NewPaymentsHandler(paymentService)
+	// Payments Entity
+	paymentProviderConfigs := map[string]payments.PaymentProviderConfig{
+		"cloudpayments": {
+			ProviderName: "cloudpayments",
+			PublicID:     cfg.CloudPayments.PublicID,
+			Secret:       cfg.CloudPayments.Secret,
+			BaseURL:      cfg.App.BaseURL,
+			Enabled:      true,
+		},
+		// Add more providers here as they become available
+		// "stripe": {
+		//     ProviderName: "stripe",
+		//     PublicID:     cfg.Stripe.PublicKey,
+		//     Secret:       cfg.Stripe.SecretKey,
+		//     BaseURL:      cfg.App.BaseURL,
+		//     Enabled:      false, // Disabled until implemented
+		// },
+	}
 
-	// Initialize subscription handlers
-	subscriptionsHandler := handlers.NewSubscriptionsHandler(paymentService)
+	paymentFactory := payments.NewPaymentProviderFactory(paymentProviderConfigs)
+	paymentsHandler := handlers.NewPaymentsHandler(paymentFactory)
+	subscriptionsHandler := handlers.NewSubscriptionsHandler(paymentFactory)
 
 	// Set Gin mode
 	if cfg.Log.Level == "debug" {
@@ -117,10 +130,12 @@ func main() {
 	router.Use(middleware.CORSMiddleware())
 	router.Use(gin.Recovery())
 
-	// API v1 routes
+	// ========================================
+	// API ROUTES - Grouped by Entity
+	// ========================================
 	v1 := router.Group("/v1")
 	{
-		// Auth routes
+		// ========= AUTH ENTITY =========
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/register", authHandler.Register)
@@ -132,6 +147,7 @@ func main() {
 			auth.POST("/password/reset", authHandler.ResetPassword)
 		}
 
+		// ========= USER ENTITY =========
 		// User profile and data (requires authentication)
 		me := v1.Group("/me")
 		me.Use(middleware.RequireAuth(authService, cfg))
@@ -142,57 +158,60 @@ func main() {
 			me.GET("/achievements", userHandler.GetMyAchievements)
 		}
 
-		// Projects
-		projects := v1.Group("/projects")
-		{
-			projects.GET("", projectsHandler.GetProjects)
-			projects.GET("/:id", projectsHandler.GetProject)
-		}
-
-		news := v1.Group("/news")
-		{
-			news.GET("", newsHandler.GetNews)
-			news.GET("/:id", newsHandler.GetNewsItem)
-		}
-
-		// Prices
-		prices := v1.Group("/prices")
-		{
-			prices.GET("", pricesHandler.GetPrices)
-			prices.GET("/:currency", pricesHandler.GetPriceByCurrency)
-		}
-
-		// Achievements
-		achievements := v1.Group("/achievements")
-		achievements.Use(middleware.RequireAuth(authService, cfg))
-		{
-			achievements.GET("", achievementsHandler.GetAchievements)
-		}
-
-		// Badges (public catalog of all achievements)
-		v1.GET("/badges", achievementsHandler.GetAchievements)
-
+		// User leaderboard (requires authentication)
 		users := v1.Group("/users")
 		users.Use(middleware.RequireAuth(authService, cfg))
 		{
 			users.GET("/leaderboard", userHandler.GetLeaderboard)
 		}
 
-		// Payments
-		payments := v1.Group("/payments")
-		payments.Use(middleware.RequireAuth(authService, cfg))
+		// ========= PROJECTS ENTITY =========
+		projects := v1.Group("/projects")
 		{
-			payments.POST("/intents", paymentsHandler.CreatePaymentIntent)
+			projects.GET("", projectsHandler.GetProjects)
+			projects.GET("/:id", projectsHandler.GetProject)
 		}
 
-		// Subscriptions
+		// ========= NEWS ENTITY =========
+		news := v1.Group("/news")
+		{
+			news.GET("", newsHandler.GetNews)
+			news.GET("/:id", newsHandler.GetNewsItem)
+		}
+
+		// ========= PRICES ENTITY =========
+		prices := v1.Group("/prices")
+		{
+			prices.GET("", pricesHandler.GetPrices)
+			prices.GET("/:currency", pricesHandler.GetPriceByCurrency)
+		}
+
+		// ========= ACHIEVEMENTS ENTITY =========
+		// Public catalog of all achievements
+		v1.GET("/badges", achievementsHandler.GetAchievements)
+
+		// ========= PAYMENTS ENTITY =========
+		payments := v1.Group("/payments")
+		{
+			// Public endpoint to get supported providers
+			payments.GET("/providers", paymentsHandler.GetSupportedProviders)
+
+			// Protected endpoints (auth required)
+			paymentsProtected := payments.Group("")
+			paymentsProtected.Use(middleware.RequireAuth(authService, cfg))
+			{
+				paymentsProtected.POST("/intents", paymentsHandler.CreatePaymentIntent)
+			}
+		}
+
+		// ========= SUBSCRIPTIONS ENTITY =========
 		subscriptions := v1.Group("/subscriptions")
 		subscriptions.Use(middleware.RequireAuth(authService, cfg))
 		{
 			subscriptions.POST("/intents", subscriptionsHandler.CreateSubscriptionIntent)
 		}
 
-		// Shares
+		// ========= SHARES ENTITY =========
 		shares := v1.Group("/shares")
 		{
 			// Public endpoint (no auth required)
@@ -211,7 +230,9 @@ func main() {
 		}
 	}
 
-	// Webhooks
+	// ========================================
+	// WEBHOOKS - Payment Provider Callbacks
+	// ========================================
 	router.POST("/webhooks/:provider", func(c *gin.Context) {
 		provider := c.Param("provider")
 		if provider == "cloudpayments" {
@@ -222,7 +243,9 @@ func main() {
 		}
 	})
 
-	// Admin interface
+	// ========================================
+	// ADMIN INTERFACE - Administrative Tools
+	// ========================================
 	adminRouter := router.Group("/admin")
 	adminRouter.Use(middleware.AdminAuth(cfg))
 	{
@@ -259,6 +282,10 @@ func main() {
 			c.JSON(http.StatusOK, donations)
 		})
 	}
+
+	// ========================================
+	// STATIC FILES & UTILITIES
+	// ========================================
 
 	// Load HTML templates
 	router.LoadHTMLGlob("web/**/*.html")

@@ -32,6 +32,11 @@ func NewCloudPaymentsService(publicID, secret, baseURL string) *CloudPaymentsSer
 	}
 }
 
+// GetProviderName returns the name of the payment provider
+func (s *CloudPaymentsService) GetProviderName() string {
+	return "cloudpayments"
+}
+
 // PaymentIntentRequest represents a payment intent request
 type PaymentIntentRequest struct {
 	Provider         string     `json:"provider"`
