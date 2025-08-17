@@ -134,6 +134,15 @@ migrate-validate:
 	@echo "Validating migration files..."
 	@./scripts/validate-migrations.sh
 
+migrate-force:
+	@echo "Forcing migration version..."
+	@if command -v migrate >/dev/null 2>&1; then \
+		read -p "Enter version to force: " version; \
+		migrate -path migrations -database "$(DB_DSN)" force $$version; \
+	else \
+		echo "golang-migrate not found. Run 'make deps' first."; \
+	fi
+
 # Seed database with initial data
 seed:
 	@echo "Seeding database..."

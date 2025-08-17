@@ -121,6 +121,22 @@ func main() {
 				},
 			},
 		},
+		"mock": {
+			ProviderName: "mock",
+			PublicID:     "mock-public-id",
+			Secret:       "mock-secret",
+			BaseURL:      cfg.App.BaseURL,
+			Enabled:      true,
+			PaymentTexts: payments.PaymentTexts{
+				DefaultDonationDescription:  cfg.Payments.DefaultDonationDescription,
+				BaseSubscriptionDescription: cfg.Payments.BaseSubscriptionDescription,
+				SubscriptionDescriptions: payments.SubscriptionDescriptions{
+					Monthly: cfg.Payments.SubscriptionDescriptions.Monthly,
+					Yearly:  cfg.Payments.SubscriptionDescriptions.Yearly,
+					Custom:  cfg.Payments.SubscriptionDescriptions.Custom,
+				},
+			},
+		},
 		// Add more providers here as they become available
 		// "stripe": {
 		//     ProviderName: "stripe",
@@ -256,10 +272,15 @@ func main() {
 	// ========================================
 	router.POST("/webhooks/:provider", func(c *gin.Context) {
 		provider := c.Param("provider")
-		if provider == "cloudpayments" {
+
+		switch provider {
+		case "cloudpayments":
 			// TODO: Implement CloudPayments webhook handler
-			c.JSON(http.StatusOK, gin.H{"message": "Webhook received"})
-		} else {
+			c.JSON(http.StatusOK, gin.H{"message": "CloudPayments webhook received"})
+		case "mock":
+			// Mock provider webhooks are processed internally
+			c.JSON(http.StatusOK, gin.H{"message": "Mock provider webhook received"})
+		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Unsupported provider"})
 		}
 	})

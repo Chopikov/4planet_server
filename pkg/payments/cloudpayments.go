@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/4planet/backend/internal/database"
@@ -148,7 +149,7 @@ func (s *CloudPaymentsService) CreateSubscriptionIntent(req *SubscriptionIntentR
 		AmountMinor:    req.AmountMinor,
 		Currency:       models.Currency(req.Currency),
 		IntervalMonths: req.IntervalMonths,
-		Status:         models.SubscriptionStatusIncomplete,
+		Status:         models.SubscriptionStatusPending,
 		Meta: map[string]interface{}{
 			"success_return_url": req.SuccessReturnURL,
 			"fail_return_url":    req.FailReturnURL,
@@ -268,24 +269,29 @@ func (s *CloudPaymentsService) processWebhookEvent(payload *WebhookPayload) erro
 
 // processPaymentEvent processes a payment event
 func (s *CloudPaymentsService) processPaymentEvent(payload *WebhookPayload) error {
-	if payload.Status != "Succeeded" {
-		return nil // Only process successful payments
-	}
-
 	// Find payment by transaction ID
 	var payment models.Payment
 	if err := s.db.Where("provider_payment_id = ?", payload.TransactionID).First(&payment).Error; err != nil {
 		return fmt.Errorf("payment not found: %w", err)
 	}
 
-	// Update payment status
-	occurredAt, _ := time.Parse(time.RFC3339, payload.OccurredAt)
-	updates := map[string]interface{}{
-		"status":      models.PaymentStatusSucceeded,
-		"occurred_at": occurredAt,
-		"meta":        map[string]interface{}{"webhook_processed": true},
+	var updates map[string]interface{}
+	if payload.Status != "Succeeded" {
+		log.Printf("Payment failed: %s (%s)", payload.Status, payload.TransactionID)
+		updates = map[string]interface{}{
+			"status": models.PaymentStatusFailed,
+			"meta":   map[string]interface{}{"webhook_processed": true, "reason": payload.Reason},
+		}
+	} else {
+		occurredAt, _ := time.Parse(time.RFC3339, payload.OccurredAt)
+		updates = map[string]interface{}{
+			"status":      models.PaymentStatusSucceeded,
+			"occurred_at": occurredAt,
+			"meta":        map[string]interface{}{"webhook_processed": true},
+		}
 	}
 
+	// Update payment status
 	if err := s.db.Model(&payment).Updates(updates).Error; err != nil {
 		return fmt.Errorf("failed to update payment: %w", err)
 	}
@@ -296,14 +302,17 @@ func (s *CloudPaymentsService) processPaymentEvent(payload *WebhookPayload) erro
 
 // processSubscriptionChargeEvent processes a subscription charge event
 func (s *CloudPaymentsService) processSubscriptionChargeEvent(payload *WebhookPayload) error {
-	if payload.Status != "Succeeded" {
-		return nil // Only process successful charges
-	}
-
 	// Find subscription
 	var subscription models.Subscription
 	if err := s.db.Where("provider_subscription_id = ?", payload.SubscriptionID).First(&subscription).Error; err != nil {
 		return fmt.Errorf("subscription not found: %w", err)
+	}
+
+	var status models.PaymentStatus
+	if payload.Status == "Succeeded" {
+		status = models.PaymentStatusSucceeded
+	} else {
+		status = models.PaymentStatusFailed
 	}
 
 	// Create payment record for this charge
@@ -317,11 +326,12 @@ func (s *CloudPaymentsService) processSubscriptionChargeEvent(payload *WebhookPa
 		SubscriptionID:    &subscription.ID,
 		AmountMinor:       amountMinor,
 		Currency:          subscription.Currency,
-		Status:            models.PaymentStatusSucceeded,
+		Status:            status,
 		OccurredAt:        &occurredAt,
 		Meta: map[string]interface{}{
 			"subscription_charge": true,
 			"webhook_processed":   true,
+			"reason":              payload.Reason,
 		},
 	}
 

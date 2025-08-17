@@ -145,7 +145,7 @@ components:
         amount_minor: { type: integer }
         currency: { $ref: '#/components/schemas/Currency' }
         interval_months: { type: integer }
-        status: { type: string, enum: [active, past_due, canceled, paused, incomplete] }
+        status: { type: string, enum: [active, past_due, canceled, paused, pending] }
         started_at: { type: string, format: date-time }
         canceled_at: { type: string, format: date-time, nullable: true }
         meta: { type: object, additionalProperties: true }

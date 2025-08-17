@@ -130,6 +130,7 @@ const (
 	PaymentProviderKaspi         PaymentProvider = "kaspi"
 	PaymentProviderPayPal        PaymentProvider = "paypal"
 	PaymentProviderTribute       PaymentProvider = "tribute"
+	PaymentProviderMock          PaymentProvider = "mock"
 )
 
 func (pp PaymentProvider) String() string {
@@ -160,11 +161,12 @@ func (pp PaymentProvider) Value() (driver.Value, error) {
 type SubscriptionStatus string
 
 const (
-	SubscriptionStatusActive     SubscriptionStatus = "active"
-	SubscriptionStatusPastDue    SubscriptionStatus = "past_due"
-	SubscriptionStatusCanceled   SubscriptionStatus = "canceled"
-	SubscriptionStatusPaused     SubscriptionStatus = "paused"
-	SubscriptionStatusIncomplete SubscriptionStatus = "incomplete"
+	SubscriptionStatusActive   SubscriptionStatus = "active"
+	SubscriptionStatusPastDue  SubscriptionStatus = "past_due"
+	SubscriptionStatusCanceled SubscriptionStatus = "canceled"
+	SubscriptionStatusPaused   SubscriptionStatus = "paused"
+	SubscriptionStatusPending  SubscriptionStatus = "pending"
+	SubscriptionStatusFailed   SubscriptionStatus = "failed"
 )
 
 func (ss SubscriptionStatus) String() string {

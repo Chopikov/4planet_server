@@ -177,7 +177,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 // Logout handles user logout
 func (h *AuthHandler) Logout(c *gin.Context) {
-	_, exists := c.Get("user_id")
+	_, exists := c.Get("auth_user_id")
 	if !exists {
 		c.Status(http.StatusNoContent)
 		return

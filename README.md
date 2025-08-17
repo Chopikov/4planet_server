@@ -287,18 +287,87 @@ export LOG_LEVEL=info
 
 ## Testing
 
-The application includes unit tests for core functionality:
+The application includes comprehensive testing capabilities for both unit tests and integration testing:
+
+### Unit Tests
+
+Core functionality unit tests:
 
 - Authentication (register/login/verify/reset)
 - Payment webhook idempotency
 - Donation creation and user counter updates
 - Achievement auto-awarding
 
-Run tests with:
+Run unit tests with:
 
 ```bash
 make test
 ```
+
+### Integration Testing with Mock Payment Provider
+
+The application includes a comprehensive mock payment provider for testing payment flows without external dependencies:
+
+#### Features Tested
+- **Payment Intent Creation**: One-time payments with realistic provider IDs
+- **Subscription Intent Creation**: Recurring payments with subscription management
+- **Automatic Webhook Processing**: Simulates real payment provider behavior
+- **Subscription Charge Automation**: Automatically creates payment records when subscriptions activate
+- **Provider ID Generation**: Realistic external IDs for testing integration scenarios
+
+#### Test Scripts
+
+```bash
+# Test complete mock payment flow (payment + subscription + charges)
+./scripts/test-mock-payment.sh
+
+# Test payment functionality with any provider
+./scripts/test-payment.sh [provider]
+
+# Test subscription functionality with any provider
+./scripts/test-subscription.sh [provider]
+
+# Test payment provider structure and validation
+./scripts/test-payment-providers.sh
+
+# Test subscription endpoint validation
+./scripts/test-subscription.sh
+
+# Test referral system
+./scripts/test-referral.sh
+```
+
+#### Mock Provider Behavior
+
+The mock provider simulates real payment providers by:
+
+1. **Generating Realistic IDs**: `mock_pay_<uuid>_<timestamp>` for payments
+2. **Creating Payment Records**: Links payments to subscriptions automatically
+3. **Sending Webhooks**: Simulates webhook delivery with proper timing
+4. **Maintaining Relationships**: Proper database relationships between entities
+5. **Status Management**: Handles payment and subscription status transitions
+
+#### Testing Architecture
+
+The testing infrastructure is designed for flexibility and maintainability:
+
+- **Modular Scripts**: Separate scripts for payments and subscriptions
+- **Provider Agnostic**: Test any payment provider by passing it as a parameter
+- **Comprehensive Suite**: Full workflow testing with `test-mock-payment.sh`
+- **Individual Testing**: Focus on specific areas with dedicated scripts
+- **Easy Extension**: Add new providers without modifying existing tests
+
+#### Testing Scenarios
+
+- ✅ User authentication and session management
+- ✅ Payment intent creation and webhook processing
+- ✅ Subscription intent creation and activation
+- ✅ Automatic subscription charge creation
+- ✅ Webhook payload validation and routing
+- ✅ Database relationship verification
+- ✅ Provider ID generation and storage
+
+This makes it easy to test the complete payment flow without requiring external payment provider accounts or real money transactions.
 
 ## Security
 

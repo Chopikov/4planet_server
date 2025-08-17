@@ -12,8 +12,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TYPE project_status AS ENUM ('planned', 'in_progress', 'completed');
 CREATE TYPE news_type AS ENUM ('achievement', 'invite', 'update');
 CREATE TYPE payment_status AS ENUM ('pending', 'succeeded', 'failed', 'refunded', 'canceled');
-CREATE TYPE payment_provider AS ENUM ('cloudpayments', 'kaspi', 'paypal', 'tribute');
-CREATE TYPE subscription_status AS ENUM ('active', 'past_due', 'canceled', 'paused', 'incomplete');
+CREATE TYPE payment_provider AS ENUM ('cloudpayments', 'kaspi', 'paypal', 'tribute', 'mock');
+CREATE TYPE subscription_status AS ENUM ('pending', 'active', 'past_due', 'canceled', 'paused', 'failed');
 CREATE TYPE user_status AS ENUM ('pending', 'active', 'blocked');
 CREATE TYPE media_kind AS ENUM ('image', 'video', 'document');
 

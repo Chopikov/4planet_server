@@ -55,7 +55,7 @@ func RequireAuth(authService *auth.Service, config *config.Config) gin.HandlerFu
 
 		// Set user in context
 		c.Set("user", user)
-		c.Set("user_id", user.AuthUserID)
+		c.Set("auth_user_id", user.AuthUserID)
 		c.Next()
 	}
 }

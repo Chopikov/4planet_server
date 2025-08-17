@@ -10,4 +10,7 @@ ALTER TABLE donations ADD CONSTRAINT fk_donations_referral_user
 
 -- Ensure share_tokens slug uniqueness at database level (additional safety)
 -- This constraint already exists from the initial migration, but let's verify it's enforced
-ALTER TABLE share_tokens ADD CONSTRAINT IF NOT EXISTS share_tokens_slug_unique UNIQUE (slug);
+-- Note: IF NOT EXISTS is not supported for ADD CONSTRAINT in PostgreSQL
+-- The constraint will be added, and if it already exists, the migration will fail
+-- This is intentional to ensure the constraint is present
+ALTER TABLE share_tokens ADD CONSTRAINT share_tokens_slug_unique UNIQUE (slug);

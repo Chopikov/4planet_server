@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Test script for Subscription Functionality
+# Test script for Payment Functionality
 BASE_URL="http://localhost:8080"
 TEST_EMAIL="test"
 TEST_PASSWORD="12345678"
 PAYMENT_PROVIDER=${1:-"mock"}
 
-echo "🌳 Testing Subscription: $PAYMENT_PROVIDER"
+echo "🌳 Testing Payment: $PAYMENT_PROVIDER"
 
 # Check dependencies
 if ! command -v jq &> /dev/null; then
@@ -44,45 +44,35 @@ if ! echo "$PROVIDERS_RESPONSE" | jq -r '.providers[].name' | grep -q "^$PAYMENT
     exit 1
 fi
 
-# Create subscription intent
-SUBSCRIPTION_RESPONSE=$(curl -s -b cookies.txt -X POST "$BASE_URL/v1/subscriptions/intents" \
+# Create payment intent
+PAYMENT_RESPONSE=$(curl -s -b cookies.txt -X POST "$BASE_URL/v1/payments/intents" \
   -H "Content-Type: application/json" \
   -d "{
     \"provider\": \"$PAYMENT_PROVIDER\",
-    \"amount_minor\": 500,
+    \"amount_minor\": 1000,
     \"currency\": \"RUB\",
     \"success_return_url\": \"http://localhost:3000/success\",
     \"fail_return_url\": \"http://localhost:3000/fail\",
-    \"interval\": \"monthly\",
-    \"interval_count\": 1,
-    \"description\": \"Test monthly subscription via $PAYMENT_PROVIDER provider\"
+    \"description\": \"Test donation via $PAYMENT_PROVIDER provider\"
   }")
 
-SUBSCRIPTION_ID=$(echo "$SUBSCRIPTION_RESPONSE" | jq -r '.provider_payload.subscription_id')
+PAYMENT_ID=$(echo "$PAYMENT_RESPONSE" | jq -r '.provider_payload.payment_id')
 
-if [ "$SUBSCRIPTION_ID" != "null" ] && [ "$SUBSCRIPTION_ID" != "" ]; then
-    echo "✅ Subscription created: $SUBSCRIPTION_ID"
+if [ "$PAYMENT_ID" != "null" ] && [ "$PAYMENT_ID" != "" ]; then
+    echo "✅ Payment created: $PAYMENT_ID"
     
     if [ "$PAYMENT_PROVIDER" = "mock" ]; then
-        echo "⏳ Waiting for subscription webhook..."
+        echo "⏳ Waiting for webhook..."
         sleep 12
-        echo "✅ Subscription webhook processed"
-        
-        echo "⏳ Waiting for charge webhook..."
-        sleep 7
-        echo "✅ Charge webhook processed"
-        
-        echo "✅ Subscription test completed"
+        echo "✅ Webhook processed"
     elif [ "$PAYMENT_PROVIDER" = "cloudpayments" ]; then
-        echo "🔗 Redirect: $(echo "$SUBSCRIPTION_RESPONSE" | jq -r '.redirect_url // "N/A"')"
-        echo "✅ Subscription test completed"
-    else
-        echo "✅ Subscription test completed"
+        echo "🔗 Redirect: $(echo "$PAYMENT_RESPONSE" | jq -r '.redirect_url // "N/A"')"
     fi
     
+    echo "✅ Payment test completed"
 else
-    echo "❌ Subscription creation failed"
-    echo "$SUBSCRIPTION_RESPONSE" | jq '.'
+    echo "❌ Payment creation failed"
+    echo "$PAYMENT_RESPONSE" | jq '.'
     exit 1
 fi
 
